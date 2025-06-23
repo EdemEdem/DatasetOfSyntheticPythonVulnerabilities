@@ -26,6 +26,18 @@ with get_db() as conn:
             FOREIGN KEY(post_id) REFERENCES posts(id)
         )
     """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS secret_table (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            secret_text TEXT,
+        )
+    """)
+    c.execute("""
+        INSERT INTO secret_table (secret_text) VALUES
+        ('Super Secret text: The eagle flies at dawn'),
+        ('Super Secret text: Project X is greenlit'),
+        ('Super Secret text: Password123!');
+    """)
     conn.commit()
 
 # List posts
