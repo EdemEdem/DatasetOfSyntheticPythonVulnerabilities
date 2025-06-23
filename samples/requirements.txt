@@ -1,0 +1,15 @@
+Flask
+Jinja2
+MarkupSafe
+fastapi
+uvicorn
+python-multipart
+click
+Django>=3.2
+bottle==0.12.25
+tornado>=6.0
+psycopg2-binary
+pyyaml
+pandas
+
+

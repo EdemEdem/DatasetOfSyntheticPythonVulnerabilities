@@ -1,0 +1,21 @@
+<!-- flask_ping_vulnerable/templates/ping.html -->
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Vulnerable Ping Utility</title>
+  </head>
+  <body>
+    <h1>Ping a Host</h1>
+    <form method="post">
+      <label for="host">Host or IP:</label>
+      <input type="text" name="host" id="host" placeholder="example.com">
+      <button type="submit">Ping</button>
+    </form>
+
+    {% if result %}
+      <h2>Output:</h2>
+      <pre>{{ result }}</pre>
+    {% endif %}
+  </body>
+</html>

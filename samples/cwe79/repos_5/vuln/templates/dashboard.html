@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Feedback Dashboard (VULNERABLE)</title>
+</head>
+<body>
+    <h1>All Feedback</h1>
+    <div>
+	{% for fb in feedback_list %}
+    <p>{{ fb }}</p>
+	{% end %}
+
+	</div>
+    <p><a href="/">Submit more feedback</a></p>
+</body>
+</html>

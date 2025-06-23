@@ -1,0 +1,101 @@
+from flask import Flask, request, jsonify, abort
+import sqlite3
+
+app = Flask(__name__)
+DB = 'blog.db'
+
+def get_db():
+    conn = sqlite3.connect(DB)
+    return conn
+
+# Initialize tables
+with get_db() as conn:
+    c = conn.cursor()
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS posts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            title TEXT,
+            body TEXT
+        )
+    """)
+    c.execute("""
+        CREATE TABLE IF NOT EXISTS comments (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            post_id INTEGER,
+            body TEXT,
+            FOREIGN KEY(post_id) REFERENCES posts(id)
+        )
+    """)
+    conn.commit()
+
+# List posts
+@app.route('/posts', methods=['GET'])
+def list_posts():
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("SELECT id, title, body FROM posts")
+    posts = [{'id': row[0], 'title': row[1], 'body': row[2]} for row in c.fetchall()]
+    return jsonify(posts)
+
+# Create post (SAFE: parameterized query)
+@app.route('/posts', methods=['POST'])
+def create_post():
+    data = request.json or {}
+    title = data.get('title', '')
+    body = data.get('body', '')
+    conn = get_db()
+    c = conn.cursor()
+    # Parameterized to avoid SQL injection
+    c.execute(
+        "INSERT INTO posts (title, body) VALUES (?, ?)",
+        (title, body)
+    )
+    conn.commit()
+    return jsonify({'id': c.lastrowid}), 201
+
+# Delete post
+@app.route('/posts/<int:post_id>', methods=['DELETE'])
+def delete_post(post_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("DELETE FROM posts WHERE id = ?", (post_id,))
+    conn.commit()
+    return '', 204
+
+# List comments for a post
+@app.route('/posts/<int:post_id>/comments', methods=['GET'])
+def list_comments(post_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute(
+        "SELECT id, body FROM comments WHERE post_id = ?",
+        (post_id,)
+    )
+    comments = [{'id': row[0], 'body': row[1]} for row in c.fetchall()]
+    return jsonify(comments)
+
+# Create comment
+@app.route('/posts/<int:post_id>/comments', methods=['POST'])
+def create_comment(post_id):
+    data = request.json or {}
+    body = data.get('body', '')
+    conn = get_db()
+    c = conn.cursor()
+    c.execute(
+        "INSERT INTO comments (post_id, body) VALUES (?, ?)",
+        (post_id, body)
+    )
+    conn.commit()
+    return jsonify({'id': c.lastrowid}), 201
+
+# Delete comment
+@app.route('/comments/<int:comment_id>', methods=['DELETE'])
+def delete_comment(comment_id):
+    conn = get_db()
+    c = conn.cursor()
+    c.execute("DELETE FROM comments WHERE id = ?", (comment_id,))
+    conn.commit()
+    return '', 204
+
+if __name__ == '__main__':
+    app.run()
