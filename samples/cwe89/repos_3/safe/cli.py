@@ -5,6 +5,7 @@ Uses parameterized queries with '?' to prevent SQL injection.
 """
 import sqlite3
 import click
+import create_db
 
 @click.command()
 @click.option('--term', required=True, help='Search term for item name')
@@ -17,7 +18,6 @@ def invsearch(term):
     # The '?' placeholder ensures the term is treated literally.
     sql = "SELECT id, name, quantity FROM inventory WHERE name LIKE ?"
     pattern = f"%{term}%"
-    click.echo(f"Executing parameterized query.")
     cur.execute(sql, (pattern,))
 
     rows = cur.fetchall()
@@ -30,4 +30,5 @@ def invsearch(term):
     conn.close()
 
 if __name__ == '__main__':
+    create_db.init_db()
     invsearch()

@@ -1,9 +1,7 @@
-# Safe configurable task runner (hardened against CWE-94)
-# Uses yaml.safe_load and restricts to allowed actions
-
+# Safe configurable task runner
 import yaml
+import sys
 
-# Define allowed actions as functions
 def cleanup():
     print("Cleaning up...")
 
@@ -14,7 +12,6 @@ def add():
     result = 3 + 4
     print("Sum:", result)
 
-# Map allowed action names to functions
 ALLOWED_ACTIONS = {
     "cleanup": cleanup,
     "greet": greet,
@@ -22,20 +19,23 @@ ALLOWED_ACTIONS = {
 }
 
 def main():
-    with open("tasks.yaml") as f:
-        try:
+    if len(sys.argv) != 2:
+        print("Usage: python run_task.py <tasks.yaml>")
+        return
+
+    yaml_file = sys.argv[1]
+
+    try:
+        with open(yaml_file) as f:
             data = yaml.safe_load(f)
-        except yaml.YAMLError as e:
-            print(f"YAML error: {e}")
-            return
-    
+    except yaml.YAMLError as e:
+        print(f"YAML error: {e}")
+        return
+
     tasks = data.get("tasks", [])
-    
     for task in tasks:
         print(f"Running task: {task.get('name')}")
         action_name = task.get("name")
-        
-        # Only allow predefined actions
         func = ALLOWED_ACTIONS.get(action_name)
         if func:
             func()

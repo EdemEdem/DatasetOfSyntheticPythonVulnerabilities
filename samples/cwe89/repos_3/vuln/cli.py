@@ -6,6 +6,7 @@ DO NOT USE IN PRODUCTION.
 """
 import sqlite3
 import click
+import create_db
 
 @click.command()
 @click.option('--term', required=True, help='Search term for item name')
@@ -18,7 +19,6 @@ def invsearch(term):
     # --- VULNERABLE: direct string concatenation ---
     # If term is "' OR '1'='1", this will match everything.
     sql = f"SELECT id, name, quantity FROM inventory WHERE name LIKE '%{term}%'"
-    click.echo(f"Executing query: {sql!r}")
     cur.execute(sql)
 
     rows = cur.fetchall()
@@ -31,4 +31,5 @@ def invsearch(term):
     conn.close()
 
 if __name__ == '__main__':
+    create_db.init_db()
     invsearch()

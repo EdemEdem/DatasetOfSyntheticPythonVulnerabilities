@@ -5,3 +5,5 @@ combined_env
 *.sqlite3
 *tar.gz
 *db
+
+*__pycache__*

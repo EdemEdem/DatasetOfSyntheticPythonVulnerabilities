@@ -10,6 +10,27 @@ cur.execute(
     '  content TEXT'
     ')'
 )
+cur.execute(
+    'CREATE TABLE IF NOT EXISTS users ('
+    '  id INTEGER PRIMARY KEY AUTOINCREMENT,'
+    '  username TEXT,'
+    '  password TEXT'
+    ')'
+)
+cur.execute("SELECT COUNT(*) FROM users;")
+count = cur.fetchone()[0]
+if count == 0:
+    print("Populating 'users' with sample data.")
+    samples = [
+            ('alice', 'supersecret_password'),
+            ('bob', 'bob123'),
+            ('charlie', 'Unhackable'),
+        ]
+    for username, password in samples:
+        cur.execute(
+            "INSERT INTO users (username, password) VALUES (?, ?);",
+            (username, password)
+        )
 conn.commit()
 
 app = Bottle()
