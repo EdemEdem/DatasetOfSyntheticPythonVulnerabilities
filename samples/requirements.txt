@@ -11,5 +11,8 @@ tornado>=6.0
 psycopg2-binary
 pyyaml
 pandas
+Werkzeug
+RestrictedPython
+requests
 
 

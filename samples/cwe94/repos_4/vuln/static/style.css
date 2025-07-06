@@ -1,0 +1,5 @@
+body { font-family: Arial, sans-serif; margin: 2rem; }
+.container { max-width: 600px; margin: auto; }
+label { display: inline-block; width: 80px; }
+input { width: calc(100% - 90px); margin-bottom: 1rem; }
+button { padding: 0.5rem 1rem; }

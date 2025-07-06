@@ -3,11 +3,15 @@
 import os
 import subprocess
 import sys
+import argparse
 
 # ─── CONFIG ────────────────────────────────────────────────────────────────────
-PROJECTS_ROOT = "/temp/syntetic_projects_dataset/"   # where repos_<name> dirs live
-DB_ROOT       = "/temp/syntetic_projects_dataset/cql_dbs"  # where to put CodeQL databases
-LANGUAGE      = "python"             # CodeQL language flag
+script_path = os.path.abspath(__file__)
+script_dir = os.path.dirname(script_path)
+samples_dir = os.path.dirname(script_dir)
+PROJECTS_ROOT = samples_dir
+DB_ROOT       = os.path.join(os.path.dirname(PROJECTS_ROOT),"cql_dbs")
+LANGUAGE      = "python"
 IGNORE_PROJECTS = [""]
 # ───────────────────────────────────────────────────────────────────────────────
 
@@ -45,12 +49,12 @@ def create_db(project_dir, cwe, state):
         return
     
     
-    db_dir = normalize(os.path.join(DB_ROOT, f"dbs_{project_name}/{state}-db"))
+    db_dir = normalize(os.path.join(DB_ROOT, cwe,f"dbs_{project_name}/{state}-db"))
     if os.path.isdir(db_dir):
         print(f"→ CodeQL DB already exists: {db_dir}, skipping.")
         return
     
-    os.makedirs(normalize(os.path.join(DB_ROOT, f"dbs_{project_name}")), exist_ok=True)
+    os.makedirs(normalize(os.path.join(DB_ROOT, cwe, f"dbs_{project_name}")), exist_ok=True)
 
     ensure_dir(DB_ROOT)
     cmd = [
@@ -107,5 +111,18 @@ def create_one():
     print("\nAll done.")
 
 if __name__ == "__main__":
-    #create_dbs_for_cwe()
-    create_one()
+    parser = argparse.ArgumentParser(
+        prog='cql database creator',
+        description='This script creates codeQL database for all the projects in the supplied cwe-identifier')
+    parser.add_argument('--cwe', type=int)
+    args = parser.parse_args()
+    cwe_num = args.cwe
+    
+    if isinstance(cwe_num, int):
+        if cwe_num in [78,79,89,94]:
+            create_dbs_for_cwe(f"cwe{cwe_num}")
+        else:
+            print("Cwe is set to a num. But ",cwe_num, " is not in [78,79,89,94]")
+    else:
+        print(cwe_num, "is not a num")
+    #create_one()

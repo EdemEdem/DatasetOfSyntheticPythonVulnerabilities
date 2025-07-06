@@ -7,3 +7,5 @@ combined_env
 *db
 
 *__pycache__*
+
+query_results/
