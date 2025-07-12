@@ -15,4 +15,6 @@ Werkzeug
 RestrictedPython
 requests
 
+pytest
+
 

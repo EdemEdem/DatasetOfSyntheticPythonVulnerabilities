@@ -12,6 +12,22 @@ OUTPUT_CQL_DIR = "C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/sam
 def normalize(path):
     return os.path.normpath(path)
 
+def run_single_query(project_output_path, project_codeql_db_path, cwe_id, codeql_query_path, query_name):
+    print("  ==> Running CodeQL analysis...")
+    query_result_bqrs_path = f"{OUTPUT_CQL_DIR}/cwe{cwe_id}/{project_output_path}.bqrs"
+    query_result_csv_path = f"{OUTPUT_CQL_DIR}/cwe{cwe_id}/{project_output_path}.csv"
+    os.makedirs(normalize(os.path.join(f"{OUTPUT_CQL_DIR}/cwe{cwe_id}/normalQueries")), exist_ok=True)
+    #Run the query
+    sp.run([CODEQL, "query", "run", f"--database={project_codeql_db_path}", f"--output={query_result_bqrs_path}", "--", codeql_query_path])
+    if not os.path.exists(query_result_bqrs_path):
+        print(f"  ==> Failed to run query `{query_name}`; aborting")
+    #Decode the query
+    sp.run([CODEQL, "bqrs", "decode", query_result_bqrs_path, "--format=csv", f"--output={query_result_csv_path}"])
+    if not os.path.exists(query_result_csv_path):
+        print(f"  ==> Failed to decode result bqrs from `{query_name}`; aborting")
+
+    return
+
 def run_analyze(project_output_path, project_codeql_db_path, cwe_id):
     print("  ==> Running CodeQL analysis...")
     query_output_result_sarif_path = f"{OUTPUT_CQL_DIR}/cwe{cwe_id}/normalQueries/{project_output_path}.sarif"
