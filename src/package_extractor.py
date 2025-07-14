@@ -7,7 +7,7 @@ from collections import defaultdict
 
 # Adjust this to your project root
 PROJECT_CWE = "cwe89"
-PROJECT_REPO = "repos_5"
+PROJECT_REPO = "repos_1"
 PROJECT_STATE = "vuln"
 PATH_PROJECT_ROOT = f"/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/{PROJECT_CWE}/{PROJECT_REPO}/vuln"
 RESULT_PATH = f"C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/package_extcractor_results/{PROJECT_CWE}/{PROJECT_REPO}/{PROJECT_STATE}"
@@ -119,6 +119,43 @@ def analyze_with_tags(root_path):
             return chain
 
         def visit_FunctionDef(self, node):
+            # simple check for it being a wrapper function
+            wrapper_chain = None
+            if node.body == 1:
+                rv = node.body[0].value
+                # direct return of an imported alias
+                if isinstance(rv, ast.Name) and rv.id in self.import_chains:
+                    wrapper_chain = list(self.import_chains[rv.id][0])
+                # return of a call on an imported alias
+                elif isinstance(rv, ast.Call):
+                    base = self.extract_base(rv.func)
+                    if base in self.import_chains:
+                        wrapper_chain = list(self.import_chains[base][0]) 
+            if not wrapper_chain and len(node.body) ==2:
+                assign_stmt, return_stmt = node.body
+                if (
+                isinstance(assign_stmt, ast.Assign)
+                and isinstance(return_stmt, ast.Return)
+                and isinstance(return_stmt.value, ast.Name)
+                and len(assign_stmt.targets) == 1
+                and isinstance(assign_stmt.targets[0], ast.Name)
+                and return_stmt.value.id == assign_stmt.targets[0].id
+                ):
+                    val = assign_stmt.value
+                    # assigned from an imported alias name
+                    if isinstance(val, ast.Name) and val.id in self.import_chains:
+                        wrapper_chain = list(self.import_chains[val.id][0])
+                    # assigned from a call on an imported alias
+                    elif isinstance(val, ast.Call):
+                        base = self.extract_base(val.func)
+                    if base in self.import_chains:
+                        wrapper_chain = list(self.import_chains[base][0])
+                # 2) If it passed, seed under project_chains + env + chains
+                if wrapper_chain:
+                    wrapper = node.name
+                    pkg = wrapper_chain[0]
+                    self.project_chains[wrapper].append(wrapper_chain)
+                    self.env[wrapper].add(pkg)
             self.push_scope()
             self.generic_visit(node)
             self.pop_scope()
@@ -210,15 +247,15 @@ def analyze_with_tags(root_path):
                             base = val.id
                         elif isinstance(val, ast.Attribute):
                             base = self.extract_base(val)
-                            # propagate tags
+                        # propagate tags
                         if base in self.project_chains:
                             for c in self.project_chains[base]:
-                                self.project_chains[tgt].append(c[:])
-                        if base in self.import_chains:
+                                new_chain = c[:] + self.extract_chain(val)
+                                self.project_chains[tgt].append(new_chain)
+                        elif base in self.import_chains:
                             for c in self.import_chains[base]:
-                                self.project_chains[tgt].append(c[:])
-                            
-
+                                new_chain = c[:] + self.extract_chain(val)
+                                self.project_chains[tgt].append(new_chain)
             # continue traversal
             self.generic_visit(node)
             
@@ -248,6 +285,14 @@ def analyze_with_tags(root_path):
                 
             elif isinstance(func,ast.Name) and func.id in self.import_chains:
                 for base_chain in self.import_chains[func.id]:
+                    p=base_chain[0]
+                    self.records.append({"file":self.current_file,"lineno":node.lineno,"col":node.col_offset,
+                        "node_type":"Call","chain":base_chain,"package":p,
+                        "code":self.lines[node.lineno-1].strip(),
+                        "tags":sorted(self.env[func.id])})
+            ###If it's a wrapper function
+            elif isinstance(func,ast.Name) and func.id in self.project_chains:
+                for base_chain in self.project_chains[func.id]:
                     p=base_chain[0]
                     self.records.append({"file":self.current_file,"lineno":node.lineno,"col":node.col_offset,
                         "node_type":"Call","chain":base_chain,"package":p,
@@ -307,6 +352,7 @@ if __name__ == "__main__":
 
     records = analyze_with_tags(PATH_PROJECT_ROOT)
     output_path = pathlib.Path(RESULT_PATH) / "usages.jsonl"
+    os.makedirs(output_path.parent, exist_ok=True)
     with open(output_path, "w", encoding="utf-8") as out:
         for rec in records:
             out.write(json.dumps(rec) + "\n")

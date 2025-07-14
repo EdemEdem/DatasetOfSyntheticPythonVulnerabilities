@@ -9,3 +9,5 @@ combined_env
 *__pycache__*
 
 query_results/
+
+samples/package_extcractor_results/cwe*/*
