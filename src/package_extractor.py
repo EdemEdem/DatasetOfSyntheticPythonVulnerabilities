@@ -127,10 +127,17 @@ def analyze_with_tags(root_path):
                 if isinstance(rv, ast.Name) and rv.id in self.import_chains:
                     wrapper_chain = list(self.import_chains[rv.id][0])
                 # return of a call on an imported alias
-                elif isinstance(rv, ast.Call):
+                elif isinstance(rv, ast.Call) and isinstance(rv.func, ast.Attribute):
                     base = self.extract_base(rv.func)
                     if base in self.import_chains:
-                        wrapper_chain = list(self.import_chains[base][0]) 
+                        new_chain = self.import_chains[base][0] + [rv.func.attr]
+                        wrapper_chain = list(new_chain)
+                        wrapper_chain = list(self.import_chains[base][0])
+                elif isinstance(rv, ast.Attribute):
+                        base = self.extract_base(rv)
+                        if base in self.import_chains:
+                            new_chain = self.import_chains[base][0] + [rv.attr]
+                            wrapper_chain = list(new_chain)
             if not wrapper_chain and len(node.body) ==2:
                 assign_stmt, return_stmt = node.body
                 if (
@@ -146,10 +153,16 @@ def analyze_with_tags(root_path):
                     if isinstance(val, ast.Name) and val.id in self.import_chains:
                         wrapper_chain = list(self.import_chains[val.id][0])
                     # assigned from a call on an imported alias
-                    elif isinstance(val, ast.Call):
+                    elif isinstance(val, ast.Call) and isinstance(val.func, ast.Attribute):
                         base = self.extract_base(val.func)
-                    if base in self.import_chains:
-                        wrapper_chain = list(self.import_chains[base][0])
+                        if base in self.import_chains:
+                            new_chain = self.import_chains[base][0] + [val.func.attr]
+                            wrapper_chain = list(new_chain)
+                    elif isinstance(val, ast.Attribute):
+                        base = self.extract_base(val)
+                        if base in self.import_chains:
+                            new_chain = self.import_chains[base][0] + [val.attr]
+                            wrapper_chain = list(new_chain)
                 # 2) If it passed, seed under project_chains + env + chains
                 if wrapper_chain:
                     wrapper = node.name
@@ -228,6 +241,13 @@ def analyze_with_tags(root_path):
                 if isinstance(rhs, ast.Call) and isinstance(rhs.func, ast.Attribute):
                     attr_node = rhs.func
                     base = self.extract_base(attr_node)
+                    if node.lineno == 47:
+                        print("47-b")
+                        print(f"tgt : {tgt}")
+                        print(f"rhs : {attr_node.attr}")
+                        print(f"base : {base}")
+                        print(self.project_chains[tgt])
+                        print(self.project_chains[base])
                     if base in self.project_chains:
                         for c in self.project_chains[base]:
                             self.env[tgt].update(self.env[base])
@@ -238,8 +258,34 @@ def analyze_with_tags(root_path):
                             self.env[tgt].update(self.env[base])
                             new_chain = c[:] + [attr_node.attr]
                             self.project_chains[tgt].append(new_chain)
-                            
-                # 4) boolean operations: x = a or b
+                    
+                    if node.lineno == 47:
+                        print("47-c")
+                        print(f"tgt : {tgt}")
+                        print(f"rhs : {attr_node.attr}")
+                        print(f"base : {base}")
+                        print(self.project_chains[tgt])
+                        print(self.project_chains[base])
+                
+                # 4) direct function calls
+                if isinstance(rhs, ast.Call) and isinstance(rhs.func, ast.Name):
+                    func = rhs.func
+                    base = self.extract_base(func)
+					# A direct function call, which has been taged and placed in project_chains (could only happen in vist_function_def)
+					# Always a wrapper
+						# Don't append funciton name to chain
+                    if base in self.project_chains:
+                        for c in self.project_chains[base]:
+                            self.env[tgt].update(self.env[base])
+                            self.project_chains[tgt].append(c[:])
+                    # Call to imported function
+                    elif base in self.import_chains:
+                        for c in self.import_chains[base]:
+                            self.env[tgt].update(self.env[base])
+                            new_chain = c[:] + [func.id]
+                            self.project_chains[tgt].append(new_chain)
+                    
+                # 5) boolean operations: x = a or b
                 if isinstance(rhs, ast.BoolOp):
                     for val in rhs.values:
                         base = None
