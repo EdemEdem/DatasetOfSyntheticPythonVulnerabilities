@@ -10,4 +10,4 @@ combined_env
 
 query_results/
 
-samples/package_extcractor_results/cwe*/*
+samples/package_extractor_results/cwe*/*

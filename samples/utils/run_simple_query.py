@@ -22,10 +22,14 @@ def run_single_query(project_output_path, project_id, project_codeql_db_path, cw
     sp.run([CODEQL, "query", "run", f"--database={project_codeql_db_path}", f"--output={query_result_bqrs_path}", "--", codeql_query_path])
     if not os.path.exists(query_result_bqrs_path):
         print(f"  ==> Failed to run query `{query_name}`; aborting")
+    else:
+        print("Succesfuly executed query (bqrs)")
     #Decode the query
     sp.run([CODEQL, "bqrs", "decode", query_result_bqrs_path, "--format=csv", f"--output={query_result_csv_path}"])
     if not os.path.exists(query_result_csv_path):
         print(f"  ==> Failed to decode result bqrs from `{query_name}`; aborting")
+    else:
+        print("Succesfuly decoded query-execution results (csv)")
 
     return
 
@@ -74,14 +78,14 @@ if __name__ == "__main__":
     parser.add_argument(
         "--single",
         action="store_true",
-        help="Filter by CWE ID (must be one of 78, 79, 89, 94)"
+        help="run on a single db or on all (must be set to true for now)"
     )
     args = parser.parse_args()
 
     valid_cwes = ["78", "79", "89", "94"]
     if args.cwe:
         print("")
-        if args.cwe in valid_cwes:
+        if args.cwe in valid_cwes and not args.single:
             cwe_id = args.cwe
             print("tryin to run analyze, something went wrong!")
         else:
@@ -89,23 +93,32 @@ if __name__ == "__main__":
             print("Ignore that message for now")
     if args.single:
         db_dir = f"{ROOT_DIR}/cql_dbs/cwe89"
-        project_id="test"
+        project_id="1"
+        project= f"repos_{project_id}"
         state="vuln-db"
+        db = f"{db_dir}/dbs_{project_id}/{state}"
         cql_query1 = "C:/Users/Edem Agbo/OneDrive/Skrivebord/MscThisis/codeql/qlpacks/codeql/python-queries/1.3.0/myQueriesForResearch/extract_funcs.ql"
         cql_query2 = "C:/Users/Edem Agbo/OneDrive/Skrivebord/MscThisis/codeql/qlpacks/codeql/python-queries/1.3.0/myQueriesForResearch/extract_funcs2.ql"
         cql_query3 = "C:/Users/Edem Agbo/OneDrive/Skrivebord/MscThisis/codeql/qlpacks/codeql/python-queries/1.3.0/myQueriesForResearch/extract_funcs3.ql"
         cql_query4 = "C:/Users/Edem Agbo/OneDrive/Skrivebord/MscThisis/codeql/qlpacks/codeql/python-queries/1.3.0/myQueriesForResearch/extract_funcs4.ql"
         cql_query5 = "C:/Users/Edem Agbo/OneDrive/Skrivebord/MscThisis/codeql/qlpacks/codeql/python-queries/1.3.0/myQueriesForResearch/extract_funcs5.ql"
         cql_querySQLI = "C:/Users/Edem Agbo/OneDrive/Skrivebord/MscThisis/codeql/qlpacks/codeql/python-queries/1.3.0/myQueriesContextGuardian/SqlInjection.ql"
-        cql_sinks_wo_flowQuery = "C:/Users/Edem Agbo/OneDrive/Skrivebord/MscThisis/codeql/qlpacks/codeql/python-queries/1.3.0/myQueriesForResearch/sinks_without_flow_for_CWE89.ql"
+        cql_sinks_to_flowQuery = "C:/Users/Edem Agbo/OneDrive/Skrivebord/MscThisis/codeql/qlpacks/codeql/python-queries/1.3.0/myQueriesForResearch/sinks_without_flow_for_CWE89.ql"
+        cql_llm_sqlI= "C:/Users/Edem Agbo/OneDrive/Skrivebord/MscThisis/codeql/qlpacks/codeql/python-queries/1.3.0/myQueriesForResearch/llm_taint_flow_cwe89.ql"
+        cql_llm_sqlI_ss= "C:/Users/Edem Agbo/OneDrive/Skrivebord/MscThisis/codeql/qlpacks/codeql/python-queries/1.3.0/myQueriesForResearch/llm_propogations_cwe89.ql"
+
 
         safe_db_dir_path = os.path.join(db_dir, project_id, state)
         #run_single_query("packageQueries",f"{project_id}-{state}", TEST_DB, "89", cql_query1, "extract_funcs1")
-        run_single_query("packageQueries",f"{project_id}-{state}", TEST_DB, "89", cql_query2, "extract_funcs2")
+        #run_single_query("packageQueries",f"{project_id}-{state}", db, "89", cql_query2, "extract_funcs2")
         #run_single_query("packageQueries",f"{project_id}-{state}", TEST_DB, "89", cql_query3, "extract_funcs3")
         #run_single_query("packageQueries",f"{project_id}-{state}", TEST_DB, "89", cql_query4, "extract_funcs4")
-        #run_single_query("packageQueries",f"{project_id}-{state}", TEST_DB, "89", cql_sinks_wo_flowQuery, "SQLI_sinks")
-        run_single_query("packageQueries",f"{project_id}-{state}", TEST_DB, "89", cql_query5, "extract_funcs5")
+        #run_single_query("packageQueries",f"{project_id}-{state}", TEST_DB, "89", cql_sinks_to_flowQuery, "SQLI_sinks")
+        #run_single_query("packageQueries",f"{project_id}-{state}", TEST_DB, "89", cql_query5, "extract_funcs5")
+        #run_single_query("testQueries",f"{project_id}-{state}", db, "89", cql_llm_sqlI, "test_cql_llm_sqlI")
+        run_single_query("testQueries",f"{project_id}-{state}", db, "89", cql_llm_sqlI_ss, "test_cql_llm_sqlI_SandS")
+
+
 
 
     else:
