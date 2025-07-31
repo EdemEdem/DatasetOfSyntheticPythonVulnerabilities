@@ -5,12 +5,18 @@ import argparse
 import requests
 import random
 import sys
+import os
 from pathlib import Path
 from itertools import islice
+from dotenv import load_dotenv
+
 
 # ------------------------------------------------------------------------------
 # Configuration / Constants
 # ------------------------------------------------------------------------------
+load_dotenv()
+api_key = os.getenv("DEEPSEEK_API_KEY")
+
 DEFAULT_CHUNK_SIZE = 50
 DEFAULT_RETRIES    = 3
 DEFAULT_TIMEOUT    = 600  # seconds

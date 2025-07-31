@@ -7,10 +7,10 @@ from collections import defaultdict
 
 # Adjust this to your project root
 PROJECT_CWE = "cwe89"
-PROJECT_REPO = "repos_1"
+PROJECT_REPO = "repos_3"
 PROJECT_STATE = "vuln"
 PATH_PROJECT_ROOT = f"/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/{PROJECT_CWE}/{PROJECT_REPO}/vuln"
-RESULT_PATH = f"C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/package_extcractor_results/{PROJECT_CWE}/{PROJECT_REPO}/{PROJECT_STATE}"
+RESULT_PATH = f"C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/package_extractor_results/{PROJECT_CWE}/{PROJECT_REPO}/{PROJECT_STATE}"
 
 
 def discover_internal_modules(root_path):
@@ -127,7 +127,7 @@ def analyze_with_tags(root_path):
                 if deco_chain:
                     pkg = deco_chain[0]
                     # only if imported or project chain
-                    if pkg in self.import_chains or pkg in self.project_chains:
+                    if pkg in self.project_chains:
                         for arg in node.args.args:
                             name = arg.arg
                             # tag parameter
@@ -144,7 +144,26 @@ def analyze_with_tags(root_path):
                                     "node_type": "param","chain": fullchain,
                                     "package": pkg,
                                     "code":self.lines[node.lineno-1].strip(),
-                                    "tags": [pkg]
+                                    "tags": [pkg], "name": name
+                                })
+                    elif pkg in self.import_chains:
+                        for arg in node.args.args:
+                            name = arg.arg
+                            # tag parameter
+                            self.env[name].add(pkg)
+                            # seed parameter chain
+                            for base in self.import_chains[pkg]:
+                                fullchain = base + deco_chain
+                                self.import_chains[name].append(fullchain)
+                                # record parameter as source candidate
+                                self.records.append({
+                                    "file": self.current_file,
+                                    "lineno": getattr(arg, 'lineno', node.lineno),
+                                    "col": getattr(arg, 'col_offset', node.col_offset),
+                                    "node_type": "param","chain": fullchain,
+                                    "package": pkg,
+                                    "code":self.lines[node.lineno-1].strip(),
+                                    "tags": [pkg], "name": name
                                 })
             # simple check for it being a wrapper function
             wrapper_chain = None
@@ -207,7 +226,7 @@ def analyze_with_tags(root_path):
                 if deco_chain:
                     pkg = deco_chain[0]
                     # only if imported or project chain
-                    if pkg in self.import_chains or pkg in self.project_chains:
+                    if pkg in self.project_chains:
                         for arg in node.args.args:
                             name = arg.arg
                             # tag parameter
@@ -224,7 +243,26 @@ def analyze_with_tags(root_path):
                                     "node_type": "param","chain": fullchain,
                                     "package": pkg,
                                     "code":self.lines[node.lineno-1].strip(),
-                                    "tags": [pkg]
+                                    "tags": [pkg], "name": name
+                                })
+                    elif pkg in self.import_chains:
+                        for arg in node.args.args:
+                            name = arg.arg
+                            # tag parameter
+                            self.env[name].add(pkg)
+                            # seed parameter chain
+                            for base in self.import_chains[pkg]:
+                                fullchain = base + deco_chain
+                                self.import_chains[name].append(fullchain)
+                                # record parameter as source candidate
+                                self.records.append({
+                                    "file": self.current_file,
+                                    "lineno": getattr(arg, 'lineno', node.lineno),
+                                    "col": getattr(arg, 'col_offset', node.col_offset),
+                                    "node_type": "param","chain": fullchain,
+                                    "package": pkg,
+                                    "code":self.lines[node.lineno-1].strip(),
+                                    "tags": [pkg], "name": name
                                 })
             wrapper_chain = None
             if node.body == 1:
@@ -523,7 +561,12 @@ def analyze_all_samples(base_dir):
                     vuln_path = os.path.join(project_path, 'vuln')
                     if os.path.isdir(vuln_path):
                         records = analyze_with_tags(vuln_path)
-                        output_path = pathlib.Path(base_dir) / "package_extractor_results" / cwe / project / "vuln" / "usages.jsonl"
+                        records.sort(key=lambda r: (
+                            r.get("package", ""),
+                            tuple(r.get("chain", [])),
+                            r.get("lineno", float('inf'))
+                            ))
+                        output_path = pathlib.Path(base_dir) / "package_extractor_results" / cwe / project / "vuln" / "usages_sorted.jsonl"
                         os.makedirs(output_path.parent, exist_ok=True)
                         with open(output_path, "w", encoding="utf-8") as out:
                             for rec in records:
@@ -533,12 +576,34 @@ def analyze_all_samples(base_dir):
                     safe_path = os.path.join(project_path, 'safe')
                     if os.path.isdir(safe_path):
                         records = analyze_with_tags(safe_path)
-                        output_path = pathlib.Path(base_dir) / "package_extractor_results"  / cwe / project / "safe" / "usages.jsonl"
+                        records.sort(key=lambda r: (
+                            r.get("package", ""),
+                            tuple(r.get("chain", [])),
+                            r.get("lineno", float('inf'))
+                            ))
+                        output_path = pathlib.Path(base_dir) / "package_extractor_results"  / cwe / project / "safe" / "usages_sorted.jsonl"
                         os.makedirs(output_path.parent, exist_ok=True)
                         with open(output_path, "w", encoding="utf-8") as out:
                             for rec in records:
                                 out.write(json.dumps(rec) + "\n")
                         print(f"Analyzed safe: {safe_path}, and wrote {len(records)} usage records to {output_path}")
+
+def analyze_one_project():
+    if os.path.isdir(PATH_PROJECT_ROOT):
+        records = analyze_with_tags(PATH_PROJECT_ROOT)
+        records.sort(key=lambda r: (
+            r.get("package", ""),
+            tuple(r.get("chain", [])),
+            r.get("lineno", float('inf'))
+            ))
+        output_path = pathlib.Path(RESULT_PATH) / "usages_sorted.jsonl"
+        os.makedirs(output_path.parent, exist_ok=True)
+        with open(output_path, "w", encoding="utf-8") as out:
+            for rec in records:
+                out.write(json.dumps(rec) + "\n")
+        print(f"Analyzed vuln: {PATH_PROJECT_ROOT}, and wrote {len(records)} usage records to {output_path}")
+
+    
 
 
 if __name__ == "__main__":
@@ -547,3 +612,4 @@ if __name__ == "__main__":
     print("External imports:", sorted(external_imports))
     
     analyze_all_samples(base_dir="/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/")
+    #analyze_one_project()

@@ -10,4 +10,7 @@ combined_env
 
 query_results/
 
+.env
+
 samples/package_extractor_results/cwe*/*
+samples/llm_results*

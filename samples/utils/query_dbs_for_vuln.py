@@ -28,11 +28,10 @@ def run_single_query(project_output_path, project_codeql_db_path, cwe_id, codeql
 
     return
 
-def run_analyze(project_output_path, project_codeql_db_path, cwe_id):
+def run_analyze(project_output_path, project_codeql_db_path, cwe_id, to_run_queries_full_path ="C:/Users/Edem Agbo/OneDrive/Skrivebord/MscThisis/codeql/qlpacks/codeql/python-queries/1.3.0/myQueriesContextGuardian"):
     print("  ==> Running CodeQL analysis...")
     query_output_result_sarif_path = f"{OUTPUT_CQL_DIR}/cwe{cwe_id}/normalQueries/{project_output_path}.sarif"
     query_output_result_csv_path = f"{OUTPUT_CQL_DIR}/cwe{cwe_id}/normalQueries/{project_output_path}.csv"
-    to_run_queries_full_path ="C:/Users/Edem Agbo/OneDrive/Skrivebord/MscThisis/codeql/qlpacks/codeql/python-queries/1.3.0/myQueriesContextGuardian"
     os.makedirs(normalize(os.path.join(f"{OUTPUT_CQL_DIR}/cwe{cwe_id}/normalQueries")), exist_ok=True)
     sp.run([CODEQL, "database", "analyze", "--rerun", project_codeql_db_path, "--format=sarif-latest", f"--output={query_output_result_sarif_path}", to_run_queries_full_path])
     if not os.path.exists(query_output_result_sarif_path):
