@@ -37,11 +37,12 @@ FROM_IMPORT_RE = re.compile(
 
 CONTEXT_LINES = 2
 
-class FlowTriager:
-    def __init__(self, repo_path: str, sarif_path: str, output_path: str, prompt_dir: str, cwe: str):
+class PromptBuilder:
+    def __init__(self, repo_path: str, sarif_path: str, sarif_output_path: str, prompt_dir: str, cwe: str, specifications_json_path):
         self.repo_path = repo_path
         self.sarif_path = sarif_path
-        self.output_path = output_path
+        self.sarif_output_path = sarif_output_path
+        self.specifications_json_path = specifications_json_path
         self.prompt_dir = prompt_dir
         self.cwe = cwe
         """self.client = LLMClient(
@@ -119,7 +120,7 @@ class FlowTriager:
         numbered = [f"{i}: {line}" for i, line in enumerate(snippet, start=start)]
         return ''.join(numbered)
 
-    def build_prompt(self, thread_flow: dict) -> str:
+    def build_one_triage_prompt(self, thread_flow: dict) -> str:
         """
         Assemble a prompt listing source, intermediate steps, and sink.
         Then ask the model if the flow is safe (YES or NO).
@@ -205,7 +206,7 @@ class FlowTriager:
         buckets.append(cur_bucket)
         return buckets
 
-    def is_flow_safe(self, prompt: str) -> bool:
+    def ask_llm_if_flow_is_safe(self, prompt: str) -> bool:
         """
         Send the prompt to the LLM and interpret YES as safe, NO as unsafe.
         """
@@ -224,7 +225,8 @@ class FlowTriager:
         except IOError as e:
             print(f"Error saving prompt to {file_path}: {e}", file=sys.stderr)
                  
-    def triage(self):
+	#builds prompts, prompts llm, returns the flows the llm deems vulnerable
+    def build_triage_prompts(self):
         # Load SARIF
         with open(self.sarif_path, 'r') as f:
             data = json.load(f)
@@ -237,22 +239,21 @@ class FlowTriager:
             for cf in res.get('codeFlows', []):
                 new_thread_flows = []
                 for tf in cf.get('threadFlows', []):
-                    prompt = self.build_prompt(tf)
+                    prompt = self.build_one_triage_prompt(tf)
                     # save prompt if directory configured
                     if self.prompt_dir:
                         flow_id = f"flow_{flow_counter}"
                         prompt_file = os.path.join(self.prompt_dir, f"{flow_id}.txt")
                         self.save_prompt(prompt, prompt_file)
-                    safe = self.is_flow_safe(prompt)
+                    safe = self.ask_llm_if_flow_is_safe(prompt)
                     if not safe:
                         new_thread_flows.append(tf)
                     flow_counter += 1
                 cf['threadFlows'] = new_thread_flows
 
         # Write filtered SARIF
-        with open(self.output_path, 'w') as out:
+        with open(self.sarif_output_path, 'w') as out:
             json.dump(data, out, indent=2)
-
 
 def main():
     parser = argparse.ArgumentParser(description='Filter safe dataflows from a SARIF file via LLM triage.')
@@ -261,8 +262,8 @@ def main():
     parser.add_argument('--output-path', help='Output SARIF file path with safe flows removed', default="C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/llm_results/llmTriagedQueries/dbs_1-vuln.sarif")
     args = parser.parse_args()
 
-    triager = FlowTriager(args.repo_path, args.sarif_path, args.output_path, "C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/llm_results/prompts", "cwe89")
-    triager.triage()
+    triager = PromptBuilder(args.repo_path, args.sarif_path, args.output_path, "C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/llm_results/prompts", "cwe89")
+    triager.build_triage_prompts()
 
 if __name__ == '__main__':
     main()

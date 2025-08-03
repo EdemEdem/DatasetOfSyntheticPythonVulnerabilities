@@ -72,12 +72,16 @@ class PredicateWriter:
                  input_source_path: str,
                  input_sink_path: str,
                  output_source_qll_file: str,
-                 output_sink_qll_file: str
+                 output_sink_qll_file: str,
+                 llm_specifications_dir_path: str,
+                 usage_nodes_path: str
                 ):
         self.input_source_path = input_source_path
         self.input_sink_path = input_sink_path
         self.output_source_qll_file = output_source_qll_file
-        self. output_sink_qll_file = output_sink_qll_file
+        self.output_sink_qll_file = output_sink_qll_file
+        self.llm_specifications_dir_path = llm_specifications_dir_path
+        self.usage_nodes_path = usage_nodes_path
     
     def get_call_from_id(self, call_id, node_dicts):
         for dict in node_dicts:
@@ -200,6 +204,66 @@ class PredicateWriter:
             #write all the source predicates to file
             f.write(self.create_sink_predicates())
             
+    def process_llm_specifications(self):
+        llm_specifications_dir_path = self.llm_specifications_dir_path
+        usage_nodes_path = self.usage_nodes_path
+        # 1) collect sink/source operation names
+        sinks = []
+        sources = []
+        name_pattern = "pre_chain"
+        for filename in os.listdir(llm_specifications_dir_path):
+            file_path = os.path.join(llm_specifications_dir_path, filename)
+            if not filename.endswith(".jsonl") and file_path:
+                print(f"filtered out filename: {filename}")
+                continue
+            if name_pattern not in filename:
+                print(f"filtered out filename: {filename}")
+                continue
+            with open(file_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        spec = json.loads(line)
+                    except json.JSONDecodeError:
+                        print(line)
+                        continue
+                    for key, val in spec.items():
+                        if val == "sink":
+                            sinks.append(key)
+                        elif val == "source":
+                            sources.append(key)
+                # 2) load usage nodes
+        nodes = []
+        with open(usage_nodes_path, "r", encoding="utf-8") as f:
+            for line in f:
+                try:
+                    nodes.append(json.loads(line))
+                except json.JSONDecodeError:
+                    continue
+        # 3) split nodes by whether their chain is in sinks or sources
+        sink_nodes = []
+        source_nodes = []
+        for node in nodes:
+            chain_key = node.get("chain")
+            chain = " ".join(chain_key)
+            if chain in sinks:
+                sink_nodes.append(node)
+            if chain in sources:
+                source_nodes.append(node)
+                
+        # 4) write out filtered nodes as JSONL
+        os.makedirs(os.path.dirname(self.input_sink_path), exist_ok=True)
+        with open(self.input_sink_path, "w", encoding="utf-8") as fout:
+            for n in sink_nodes:
+                fout.write(json.dumps(n) + "\n")
+            print(f"Wrote {len(sink_nodes)} entries to {self.input_sink_path}")
+        os.makedirs(os.path.dirname(self.input_source_path), exist_ok=True)
+        with open(self.input_source_path, "w", encoding="utf-8") as fout:
+            for n in source_nodes:
+                fout.write(json.dumps(n) + "\n")
+            print(f"Wrote {len(source_nodes)} entries to {self.input_source_path}")
+        return
+
+            
             
 def wirte_for_all_in_cwe(cwe):
     node_extraction_dir="C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/package_extractor_results"
@@ -214,15 +278,19 @@ def wirte_for_all_in_cwe(cwe):
                     input_sink_path = pathlib.Path(path) / "sink_usages.jsonl"
                     output_source_qll_file = pathlib.Path(path) / "TestSources.qll"
                     output_sink_qll_file = pathlib.Path(path) / "TestSinks.qll"
-                    write_for_one_project(input_source_path, input_sink_path, output_source_qll_file, output_sink_qll_file)
+                    usage_nodes_path = pathlib.Path(path) / "usages_sorted.qll"
+                    llm_specifications_dir_path = "C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/llm_results/results"
+                    write_for_one_project(input_source_path, input_sink_path, output_source_qll_file, output_sink_qll_file, llm_specifications_dir_path, usage_nodes_path)
 
         
-def write_for_one_project(input_source_path, input_sink_path, output_source_qll_path, output_sink_qll_file):
+def write_for_one_project(input_source_path, input_sink_path, output_source_qll_path, output_sink_qll_file, llm_specifications_dir_path, usage_nodes_path):
     predicateWriter = PredicateWriter(
         input_source_path=input_source_path,
         input_sink_path=input_sink_path,
         output_source_qll_file=output_source_qll_path,
-        output_sink_qll_file=output_sink_qll_file
+        output_sink_qll_file=output_sink_qll_file,
+        llm_specifications_dir_path=llm_specifications_dir_path,
+        usage_nodes_path=usage_nodes_path
 	)
 
     predicateWriter.write_source_qll_file()
@@ -230,4 +298,20 @@ def write_for_one_project(input_source_path, input_sink_path, output_source_qll_
 
 
 if __name__ == "__main__":
-    wirte_for_all_in_cwe("cwe89")
+    #wirte_for_all_in_cwe("cwe89")
+    path="C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/package_extractor_results/cwe89/repos_3/vuln"
+    input_source_path = f"{path}/source_usages.jsonl"
+    input_sink_path = f"{path}/sink_usages.jsonl"
+    output_source_qll_file =f"{path}/TestSources.qll"
+    output_sink_qll_file = f"{path}/TestSinks.qll"
+    usage_nodes_path = "C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/package_extractor_results/cwe89/repos_3/vuln/usages_sorted.jsonl"
+    llm_specifications_dir_path = "C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/llm_results/results"
+    predicateWriter = PredicateWriter(
+        input_source_path=input_source_path,
+        input_sink_path=input_sink_path,
+        output_source_qll_file=output_source_qll_file,
+        output_sink_qll_file=output_sink_qll_file,
+        llm_specifications_dir_path=llm_specifications_dir_path,
+        usage_nodes_path=usage_nodes_path
+	)
+    predicateWriter.process_llm_specifications()

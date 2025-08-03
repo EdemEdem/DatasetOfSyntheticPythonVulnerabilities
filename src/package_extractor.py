@@ -75,6 +75,7 @@ def analyze_with_tags(root_path):
             self.env_stack = [defaultdict(set)]
             # var -> list of full chains
             self.project_chains_stack = [defaultdict(list)]
+            self.type_chains_stack = [defaultdict(list)]
             self.import_chains = defaultdict(list)
             self.records = []
             self.records = []
@@ -91,24 +92,34 @@ def analyze_with_tags(root_path):
         def project_chains(self):
             return self.project_chains_stack[-1]
         
+        @property
+        def type_chains(self):
+            return self.type_chains_stack[-1]
+        
         def push_scope(self):
             # inherit imports tags and chains
             base_env = self.env_stack[0]
             base_pch = self.project_chains_stack[0]
+            base_tch = self.type_chains_stack[0]
             new_env = defaultdict(set, {k: set(v) for k, v in base_env.items()})
             new_pch = defaultdict(list, {k: [c[:] for c in v] for k, v in base_pch.items()})
+            new_tch = defaultdict(list, {k: [c[:] for c in v] for k, v in base_tch.items()})
             self.env_stack.append(new_env)
             self.project_chains_stack.append(new_pch)
+            self.type_chains_stack.append(new_tch)
 
         def pop_scope(self):
             self.env_stack.pop()
             self.project_chains_stack.pop()
+            self.type_chains_stack.pop()
 
         def extract_base(self, node):
             while isinstance(node, ast.Attribute):
                 node = node.value
             return node.id if isinstance(node, ast.Name) else None
         
+        #extract all the nodes on an attribute chain
+        # if node = x.y.z or x.y.z(), this returns ['x','y','z']
         def extract_chain(self, node):
             chain=[]
             if isinstance(node, ast.Call):
@@ -125,16 +136,18 @@ def analyze_with_tags(root_path):
             for deco in node.decorator_list:
                 deco_chain = self.extract_chain(deco)
                 if deco_chain:
-                    pkg = deco_chain[0]
-                    # only if imported or project chain
-                    if pkg in self.project_chains:
+                    base_deco = deco_chain[0]
+                    # if decorator's base node is in project chain
+                    if base_deco in self.project_chains:
                         for arg in node.args.args:
                             name = arg.arg
                             # tag parameter
-                            self.env[name].add(pkg)
                             # seed parameter chain
-                            for base in self.project_chains[pkg]:
-                                fullchain = base + deco_chain
+                            for base_chain in self.project_chains[base_deco]:
+                                
+                                fullchain = base_chain + deco_chain[1:]
+                                package = fullchain[0]
+                                self.env[name].add(package)
                                 self.project_chains[name].append(fullchain)
                                 # record parameter as source candidate
                                 self.records.append({
@@ -142,28 +155,31 @@ def analyze_with_tags(root_path):
                                     "lineno": getattr(arg, 'lineno', node.lineno),
                                     "col": getattr(arg, 'col_offset', node.col_offset),
                                     "node_type": "param","chain": fullchain,
-                                    "package": pkg,
+                                    "package": package,
                                     "code":self.lines[node.lineno-1].strip(),
-                                    "tags": [pkg], "name": name
+                                    "tags": [base_deco], "name": name
                                 })
-                    elif pkg in self.import_chains:
+                    # if decorator's base node is in import chains
+                    elif base_deco in self.import_chains:
                         for arg in node.args.args:
                             name = arg.arg
                             # tag parameter
-                            self.env[name].add(pkg)
+                            self.env[name].add(base_deco)
                             # seed parameter chain
-                            for base in self.import_chains[pkg]:
-                                fullchain = base + deco_chain
-                                self.import_chains[name].append(fullchain)
+                            for base_chain in self.import_chains[base_deco]:
+                                fullchain = base_chain + deco_chain[1:]
+                                self.project_chains[name].append(fullchain)
+                                package = fullchain[0]
+                                self.env[name].add(package)
                                 # record parameter as source candidate
                                 self.records.append({
                                     "file": self.current_file,
                                     "lineno": getattr(arg, 'lineno', node.lineno),
                                     "col": getattr(arg, 'col_offset', node.col_offset),
                                     "node_type": "param","chain": fullchain,
-                                    "package": pkg,
+                                    "package": package,
                                     "code":self.lines[node.lineno-1].strip(),
-                                    "tags": [pkg], "name": name
+                                    "tags": [base_deco], "name": name
                                 })
             # simple check for it being a wrapper function
             wrapper_chain = None
@@ -224,16 +240,18 @@ def analyze_with_tags(root_path):
             for deco in node.decorator_list:
                 deco_chain = self.extract_chain(deco)
                 if deco_chain:
-                    pkg = deco_chain[0]
-                    # only if imported or project chain
-                    if pkg in self.project_chains:
+                    base_deco = deco_chain[0]
+                    # if decorator's base node is in project chain
+                    if base_deco in self.project_chains:
                         for arg in node.args.args:
                             name = arg.arg
                             # tag parameter
-                            self.env[name].add(pkg)
                             # seed parameter chain
-                            for base in self.project_chains[pkg]:
-                                fullchain = base + deco_chain
+                            for base_chain in self.project_chains[base_deco]:
+                                
+                                fullchain = base_chain + deco_chain[1:]
+                                package = fullchain[0]
+                                self.env[name].add(package)
                                 self.project_chains[name].append(fullchain)
                                 # record parameter as source candidate
                                 self.records.append({
@@ -241,29 +259,33 @@ def analyze_with_tags(root_path):
                                     "lineno": getattr(arg, 'lineno', node.lineno),
                                     "col": getattr(arg, 'col_offset', node.col_offset),
                                     "node_type": "param","chain": fullchain,
-                                    "package": pkg,
+                                    "package": package,
                                     "code":self.lines[node.lineno-1].strip(),
-                                    "tags": [pkg], "name": name
+                                    "tags": [base_deco], "name": name
                                 })
-                    elif pkg in self.import_chains:
+                    # if decorator's base node is in import chains
+                    elif base_deco in self.import_chains:
                         for arg in node.args.args:
                             name = arg.arg
                             # tag parameter
-                            self.env[name].add(pkg)
+                            self.env[name].add(base_deco)
                             # seed parameter chain
-                            for base in self.import_chains[pkg]:
-                                fullchain = base + deco_chain
-                                self.import_chains[name].append(fullchain)
+                            for base_chain in self.import_chains[base_deco]:
+                                fullchain = base_chain + deco_chain[1:]
+                                self.project_chains[name].append(fullchain)
+                                package = fullchain[0]
+                                self.env[name].add(package)
                                 # record parameter as source candidate
                                 self.records.append({
                                     "file": self.current_file,
                                     "lineno": getattr(arg, 'lineno', node.lineno),
                                     "col": getattr(arg, 'col_offset', node.col_offset),
                                     "node_type": "param","chain": fullchain,
-                                    "package": pkg,
+                                    "package": package,
                                     "code":self.lines[node.lineno-1].strip(),
-                                    "tags": [pkg], "name": name
+                                    "tags": [base_deco], "name": name
                                 })
+            # simple check for it being a wrapper function
             wrapper_chain = None
             if node.body == 1:
                 rv = node.body[0].value
@@ -336,7 +358,10 @@ def analyze_with_tags(root_path):
                 name = alias.asname or alias.name
                 self.alias_to_pkg[name] = pkg
                 self.env[name].add(pkg)
-                self.import_chains[name].append([pkg])
+                self.import_chains[name].append([pkg, name])
+                ###extract the node_type that a usage of the name node would be. Then add it to type_chains
+                # if not possible, this can be done form elsewhere. Maybe it even should be done from elsewhere
+					# because the vaule(or whatever you wanna call it) of the variable/pointer can be changed
             self.generic_visit(node)
 
         def visit_Assign(self, node):
@@ -352,10 +377,12 @@ def analyze_with_tags(root_path):
                     self.env[tgt].update(self.env[rhs.id])
                     for c in self.project_chains[rhs.id]:
                         self.project_chains[tgt].append(c[:])
+                        self.type_chains[tgt].append("var")
                 if isinstance(rhs, ast.Name) and rhs.id in self.import_chains:
                     self.env[tgt].update(self.env[rhs.id])
                     for c in self.import_chains[rhs.id]:
                         self.project_chains[tgt].append(c[:])
+                        self.type_chains[tgt].append("var")
                 
                 # 2) attribute access: x = y.attr
                 if isinstance(rhs, ast.Attribute):
@@ -367,6 +394,7 @@ def analyze_with_tags(root_path):
                             # extend chain
                             new_chain = c[:] + [rhs.attr]
                             self.project_chains[tgt].append(new_chain)
+                            self.type_chains[tgt].append("attr")
                     if base in self.import_chains:
                         for c in self.import_chains[base]:
                             # propagate tags from base
@@ -374,7 +402,7 @@ def analyze_with_tags(root_path):
                             # extend chain
                             new_chain = c[:] + [rhs.attr]
                             self.project_chains[tgt].append(new_chain)
-                            
+                            self.type_chains[tgt].append("attr")
 
                 # 3) method call: x = y.attr()
                 if isinstance(rhs, ast.Call) and isinstance(rhs.func, ast.Attribute):
@@ -385,11 +413,13 @@ def analyze_with_tags(root_path):
                             self.env[tgt].update(self.env[base])
                             new_chain = c[:] + [attr_node.attr]
                             self.project_chains[tgt].append(new_chain)
+                            self.type_chains[tgt].append("call")
                     if base in self.import_chains:
                         for c in self.import_chains[base]:
                             self.env[tgt].update(self.env[base])
                             new_chain = c[:] + [attr_node.attr]
                             self.project_chains[tgt].append(new_chain)
+                            self.type_chains[tgt].append("call")
                 
                 # 4) direct function calls
                 if isinstance(rhs, ast.Call) and isinstance(rhs.func, ast.Name):
@@ -402,30 +432,41 @@ def analyze_with_tags(root_path):
                         for c in self.project_chains[base]:
                             self.env[tgt].update(self.env[base])
                             self.project_chains[tgt].append(c[:])
+                            self.type_chains[tgt].append("call")
                     # Call to imported function
                     elif base in self.import_chains:
                         for c in self.import_chains[base]:
                             self.env[tgt].update(self.env[base])
-                            new_chain = c[:] + [func.id]
+                            new_chain = c[:]
+                            if base != c[-1]:
+                                new_chain = c[:] + [func.id]
+                                print("[WARNING] Direct call to imported function, and call-name's chain does not end in the call-name")
+                                print(f"This sciprt's output-file might not be a correct implementation. Check chains similar to {new_chain}")
                             self.project_chains[tgt].append(new_chain)
+                            self.type_chains[tgt].append("call")
                     
                 # 5) boolean operations: x = a or b
                 if isinstance(rhs, ast.BoolOp):
                     for val in rhs.values:
                         base = None
+                        node_type = "name"
                         if isinstance(val, ast.Name):
                             base = val.id
                         elif isinstance(val, ast.Attribute):
                             base = self.extract_base(val)
+                            node_type = "attr"
                         # propagate tags
                         if base in self.project_chains:
                             for c in self.project_chains[base]:
                                 new_chain = c[:] + self.extract_chain(val)
                                 self.project_chains[tgt].append(new_chain)
+                                self.type_chains[tgt].append(node_type)
                         elif base in self.import_chains:
                             for c in self.import_chains[base]:
                                 new_chain = c[:] + self.extract_chain(val)
                                 self.project_chains[tgt].append(new_chain)
+                                self.type_chains[tgt].append(node_type)
+                                
             # continue traversal
             self.generic_visit(node)
             
@@ -457,6 +498,8 @@ def analyze_with_tags(root_path):
                     for bc in self.import_chains[base]:
                         fc=bc[:] + node_chain
                         pkg=bc[0]
+                        if bc[0] == base:
+                            fc = node_chain
                         self.records.append({"file":self.current_file,"lineno":node.lineno,"col":node.col_offset,
                                              "node_type":"Call","chain":fc,"package":pkg,
                                              "code":self.lines[node.lineno-1].strip(),
@@ -527,6 +570,9 @@ def analyze_with_tags(root_path):
                 for base_chain in self.import_chains[base]:
                     node_chain = self.extract_chain(node)
                     full_chain = base_chain[:] + node_chain
+                    #if the base node is the package-name, dont extract the chain of the package node
+                    if base == base_chain[0]:
+                        full_chain = node_chain
                     self.records.append({
                         "file": self.current_file,
                         "lineno": node.lineno,
@@ -596,7 +642,7 @@ def analyze_one_project():
             tuple(r.get("chain", [])),
             r.get("lineno", float('inf'))
             ))
-        output_path = pathlib.Path(RESULT_PATH) / "usages_sorted.jsonl"
+        output_path = pathlib.Path(RESULT_PATH) / "usages_test.jsonl"
         os.makedirs(output_path.parent, exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as out:
             for rec in records:
