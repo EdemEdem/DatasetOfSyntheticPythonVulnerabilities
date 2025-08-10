@@ -1,21 +1,26 @@
 import json
 import os
 import sys
+import pathlib
 from collections import defaultdict
+from openai import OpenAI
+from dotenv import load_dotenv
 from typing import List, Dict, Iterator, Any, Union
-import prompt_templates
+import src.prompt_templates
 
 class UsagePrompter:
     def __init__(
         self,
         specifications_json_path: str,
+        output_dir: str,
+        spesification_result_dir: str,
         cwe: str,
         cwe_context: str,
-        output_dir: str,
         batch_size: Union[int, str] = 20
     ):
         # Path to JSONL file; CWE identifier and context for prompts
         self.specifications_json_path = specifications_json_path
+        self.spesification_result_dir = spesification_result_dir
         self.cwe = cwe
         self.cwe_context = cwe_context
         self.output_dir = output_dir
@@ -82,7 +87,7 @@ class UsagePrompter:
             for chain in pkgs[pkg]:
                 chain_str = " ".join(chain)
                 chains.append(chain_str)
-            prompt =prompt_templates.PACKAGE_PROMPT_SINK_AND_SOURCE.format(package=pkg, cwe=self.cwe, body="\n".join(chains))
+            prompt =src.prompt_templates.PACKAGE_PROMPT_SINK_AND_SOURCE.format(package=pkg, cwe=self.cwe, body="\n".join(chains))
             prompts.append(prompt)
         return prompts
 
@@ -100,8 +105,68 @@ class UsagePrompter:
                 with open(filename, 'w') as f:
                     f.write(prompt)
                 total += 1
-        print(f"Saved {total} prompts to {self.output_dir}")
+        print(f"Saved {total} prompts to {self.output_dir}")        
+    
+    def run_prompts(self):
+        prompts = self.load_prompts(self.output_dir)
+        if not prompts:
+            print("No prompts loaded. Exiting.")
+            sys.exit(0)
         
+        for filename, prompt in prompts.items():
+            print(f"Running prompt: {filename}")
+            raw = self.run_prompt(prompt)
+            try:
+                data = json.loads(raw)
+            except json.JSONDecodeError as e:
+                print(f"Failed to parse JSON for {filename}: {e}")
+                continue
+            # Include the source prompt filename for reference
+            # # Append to JSONL
+            output_filename = os.path.splitext(filename)[0] + "_result.jsonl"
+            output_path = pathlib.Path(self.spesification_result_dir) / output_filename
+            with open(output_path, "a", encoding="utf-8") as f:
+                for key, value in data.items():
+                    line = json.dumps({ key: value })
+                    f.write(line + "\n")
+        return
+        
+    def run_prompt(self, prompt):
+        load_dotenv()
+        api_key = os.getenv("DEEPSEEK_API_KEY")
+        client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": src.prompt_templates.PACKAGE_PROMPT_SYSTEM_PROMPT},
+                {"role": "user", "content": prompt},
+                ],
+            response_format={
+                'type': 'json_object'
+                },
+            stream=False
+            )
+        return response.choices[0].message.content
+    
+    def load_prompts(self, dir_path):
+        prompt_prefix = "pre_chain"
+        # Directory containing prompt files (each file should contain one prompt)
+        prompts = {}
+        if not os.path.isdir(dir_path):
+            print(f"Prompt directory '{dir_path}' does not exist.")
+            return prompts
+        for filename in os.listdir(dir_path):
+            file_path = os.path.join(dir_path, filename)
+            if os.path.isfile(file_path):
+                if prompt_prefix and prompt_prefix not in filename:
+                    continue
+                try:
+                    with open(file_path, "r", encoding="utf-8") as f:
+                        prompts[filename] = f.read()
+                except Exception as e:
+                    print(f"Failed to read {file_path}: {e}")
+        return prompts
+    
 def main():
     '''
     import argparse

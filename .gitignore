@@ -10,6 +10,9 @@ combined_env
 
 query_results/
 
+projects*
+legacy*
+
 .env
 
 samples/package_extractor_results/cwe*/*

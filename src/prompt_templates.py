@@ -13,16 +13,30 @@ PACKAGE_PROMPT_SYSTEM_PROMPT = """
 and output them in JSON format. 
 
 EXAMPLE INPUT: 
-You are going to analyze the usage of the package click.
+You are going to analyze the usage of the package foo.
 Define which of the following nodes that can be a Source, Sink or none for the weakness CWE 89 (SQL injection):
-click command
-click echo
-click option
+foo bar
+foo baz
+foo qux
 
 EXAMPLE JSON OUTPUT:
 {
-  "click command": "none",
-  "click echo": "sink",
-  "click option": "source"
+  "foo bar": "none",
+  "foo baz": "sink",
+  "foo qux": "source"
 }
+"""
+
+
+FLOW_PROMPT_SYSTEM_PROMPT = """
+"You are a application security assitant. Help the user identify if this dataflow is truely vulnerable to {cwe} or not.
+Look for posible sanitizers on the dataflow. {cwe} is commonly prevented by {sanitizer_context}
+Reply with Yes if the dataflow is vulnerable, and No if it's not vulnerable, also provide a reason for your judgement, and output them in JSON format.
+
+EXAMPLE JSON OUTPUT:
+{{
+  "judgement": "yes",
+  "reason": "In this dataflow a malicous input can arrive at the source, and travel through all the nodes and arrive at the sink without being neutralized or stopped by a filter. No instance of {sanitizer_context} or similar seems to take place through out the whole dataflow",
+}}
+
 """

@@ -41,6 +41,16 @@ def run_analyze(project_output_path, project_codeql_db_path, cwe_id, to_run_quer
         print("  ==> Result CSV not produced; aborting"); return
     return
 
+def run_analyze_for_pipeline(output_sarif, output_csv, project_codeql_db_path, to_run_queries_full_path ="C:/Users/Edem Agbo/OneDrive/Skrivebord/MscThisis/codeql/qlpacks/codeql/python-queries/1.3.0/myQueriesContextGuardian"):
+    print("  ==> Running CodeQL analysis...")
+    sp.run([CODEQL, "database", "analyze", "--rerun", project_codeql_db_path, "--format=sarif-latest", f"--output={output_sarif}", to_run_queries_full_path])
+    if not os.path.exists(output_sarif):
+        print("  ==> Result SARIF not produced; aborting"); return
+    sp.run([CODEQL, "database", "analyze", "--rerun", project_codeql_db_path, "--format=csv", f"--output={output_csv}", to_run_queries_full_path])
+    if not os.path.exists(output_csv):
+        print("  ==> Result CSV not produced; aborting"); return
+    return
+
 def locate_dbs_and_run_analyze(cwe_id):
     if not cwe_id.isdigit():
         return

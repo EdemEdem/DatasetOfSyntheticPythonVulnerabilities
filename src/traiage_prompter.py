@@ -9,7 +9,11 @@ import argparse
 import json
 import os
 import sys
+import pathlib
 import re
+from openai import OpenAI
+from dotenv import load_dotenv
+from src.prompt_templates import FLOW_PROMPT_SYSTEM_PROMPT
 
 # matches lines like “1: import os” or “123: import mypkg.submod, otherpkg  # comment”
 IMPORT_RE = re.compile(
@@ -37,21 +41,15 @@ FROM_IMPORT_RE = re.compile(
 
 CONTEXT_LINES = 2
 
-class PromptBuilder:
-    def __init__(self, repo_path: str, sarif_path: str, sarif_output_path: str, prompt_dir: str, cwe: str, specifications_json_path):
+class TriagePrompter:
+    def __init__(self, repo_path: str, sarif_path: str, filtred_sarif_path: str, prompt_dir: str, result_dir: str, cwe: str, sanitizer_context: str):
         self.repo_path = repo_path
         self.sarif_path = sarif_path
-        self.sarif_output_path = sarif_output_path
-        self.specifications_json_path = specifications_json_path
+        self.filtred_sarif_path = filtred_sarif_path
         self.prompt_dir = prompt_dir
+        self.result_dir = result_dir
         self.cwe = cwe
-        """self.client = LLMClient(
-            base_url   = "http://localhost:11434",
-            model      = "llama3.1",
-            temperature=0.0,
-            top_k      = 0,
-            top_p      = 0.0
-            )"""
+        self.sanitizer_context = sanitizer_context
 
     def extract_code(self, location: dict, context_lines_top=CONTEXT_LINES, context_lines_bottom=CONTEXT_LINES) -> str:
         """
@@ -206,14 +204,39 @@ class PromptBuilder:
         buckets.append(cur_bucket)
         return buckets
 
-    def ask_llm_if_flow_is_safe(self, prompt: str) -> bool:
-        """
-        Send the prompt to the LLM and interpret YES as safe, NO as unsafe.
-        """
-        #response = self.client.generate(prompt)
-        #first = response.strip().split()[0].upper()
-        first = "yes"
-        return first == 'YES'
+    def ask_llm_if_flow_is_safe(self, prompt: str, filename) -> bool:
+        raw = self.generate_response(prompt)
+        try:
+            data = json.loads(raw)
+        except json.JSONDecodeError as e:
+                print(f"Failed to parse JSON for {filename}: {e}")
+        output_path = pathlib.Path(self.result_dir) / filename
+        with open(output_path, "a", encoding="utf-8") as f:
+            for key, value in data.items():
+                line = json.dumps({ key: value })
+                f.write(line + "\n")
+            print(f"Appended result for {filename} to {output_path}")
+        return data["judgement"]
+    
+    def generate_response(self,prompt):
+        load_dotenv()
+        api_key = os.getenv("DEEPSEEK_API_KEY")
+        client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
+        response = client.chat.completions.create(
+            model="deepseek-chat",
+            messages=[
+                {"role": "system", "content": FLOW_PROMPT_SYSTEM_PROMPT.format(cwe=self.cwe, sanitizer_context=self.sanitizer_context)},
+                {"role": "user", "content": prompt},
+                ],
+            response_format={
+                'type': 'json_object'
+                },
+            stream=False
+            )
+        if response.choices[0].message.content is None:
+            print("Error. No model reponse. Mdel response was: None")
+            return {"judgement":"none"}
+        return response.choices[0].message.content
     
     def save_prompt(self, prompt: str, file_path: str) -> None:
         """
@@ -226,7 +249,7 @@ class PromptBuilder:
             print(f"Error saving prompt to {file_path}: {e}", file=sys.stderr)
                  
 	#builds prompts, prompts llm, returns the flows the llm deems vulnerable
-    def build_triage_prompts(self):
+    def build_and_run_triage_prompts(self):
         # Load SARIF
         with open(self.sarif_path, 'r') as f:
             data = json.load(f)
@@ -244,15 +267,17 @@ class PromptBuilder:
                     if self.prompt_dir:
                         flow_id = f"flow_{flow_counter}"
                         prompt_file = os.path.join(self.prompt_dir, f"{flow_id}.txt")
+                        print(self.prompt_dir)
+                        print(prompt_file)
                         self.save_prompt(prompt, prompt_file)
-                    safe = self.ask_llm_if_flow_is_safe(prompt)
+                    safe = self.ask_llm_if_flow_is_safe(prompt, f"{flow_id}.txt")
                     if not safe:
                         new_thread_flows.append(tf)
                     flow_counter += 1
                 cf['threadFlows'] = new_thread_flows
 
         # Write filtered SARIF
-        with open(self.sarif_output_path, 'w') as out:
+        with open(self.filtred_sarif_path, 'w') as out:
             json.dump(data, out, indent=2)
 
 def main():
@@ -262,8 +287,8 @@ def main():
     parser.add_argument('--output-path', help='Output SARIF file path with safe flows removed', default="C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/llm_results/llmTriagedQueries/dbs_1-vuln.sarif")
     args = parser.parse_args()
 
-    triager = PromptBuilder(args.repo_path, args.sarif_path, args.output_path, "C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/llm_results/prompts", "cwe89")
-    triager.build_triage_prompts()
+    triager = TriagePrompter(args.repo_path, args.sarif_path, args.output_path, "C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/llm_results/prompts", "cwe89")
+    triager.build_and_run_triage_prompts()
 
 if __name__ == '__main__':
     main()

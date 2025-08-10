@@ -9,8 +9,8 @@ from collections import defaultdict
 PROJECT_CWE = "cwe89"
 PROJECT_REPO = "repos_3"
 PROJECT_STATE = "vuln"
-PATH_PROJECT_ROOT = f"/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/{PROJECT_CWE}/{PROJECT_REPO}/vuln"
-RESULT_PATH = f"C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/package_extractor_results/{PROJECT_CWE}/{PROJECT_REPO}/{PROJECT_STATE}"
+PATH_PROJECT_ROOT = f"/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/{PROJECT_CWE}/{PROJECT_REPO}/{PROJECT_STATE}"
+RESULT_PATH = f"C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/package_extractor_results/{PROJECT_CWE}/{PROJECT_REPO}/{PROJECT_STATE}/usages_test.jsonl"
 
 
 def discover_internal_modules(root_path):
@@ -65,6 +65,25 @@ def find_imports(root_path):
                     kind = classify_import(pkg, internal_modules, root)
                     (internal_imports if kind == "internal" else external_imports).add(pkg)
     return internal_imports, external_imports
+
+def extract_external_imports_to_file(root_path, output_path):
+    internal_imports, external_imports = find_imports(root_path)
+    
+    output_file = pathlib.Path(output_path)
+    output_file.parent.mkdir(parents=True, exist_ok=True)
+    
+    with output_file.open("w", encoding="utf-8") as f:
+        # First line: internal imports
+        f.write(json.dumps({
+            "type": "internal",
+            "imports": sorted(list(internal_imports))
+        }) + "\n")
+        
+        # Second line: external imports
+        f.write(json.dumps({
+            "type": "external",
+            "imports": sorted(list(external_imports))
+        }) + "\n")
 
 def analyze_with_tags(root_path):
     class TagTracker(ast.NodeVisitor):
@@ -634,20 +653,20 @@ def analyze_all_samples(base_dir):
                                 out.write(json.dumps(rec) + "\n")
                         print(f"Analyzed safe: {safe_path}, and wrote {len(records)} usage records to {output_path}")
 
-def analyze_one_project():
-    if os.path.isdir(PATH_PROJECT_ROOT):
-        records = analyze_with_tags(PATH_PROJECT_ROOT)
+def analyze_one_project(project_root, package_analysis_result_path):
+    if os.path.isdir(project_root):
+        records = analyze_with_tags(project_root)
         records.sort(key=lambda r: (
             r.get("package", ""),
             tuple(r.get("chain", [])),
             r.get("lineno", float('inf'))
             ))
-        output_path = pathlib.Path(RESULT_PATH) / "usages_test.jsonl"
+        output_path = pathlib.Path(package_analysis_result_path)
         os.makedirs(output_path.parent, exist_ok=True)
         with open(output_path, "w", encoding="utf-8") as out:
             for rec in records:
                 out.write(json.dumps(rec) + "\n")
-        print(f"Analyzed vuln: {PATH_PROJECT_ROOT}, and wrote {len(records)} usage records to {output_path}")
+        print(f"Analyzed vuln: {project_root}, and wrote {len(records)} usage records to {output_path}")
 
     
 
@@ -657,5 +676,5 @@ if __name__ == "__main__":
     print("Internal imports:", sorted(internal_imports))
     print("External imports:", sorted(external_imports))
     
-    analyze_all_samples(base_dir="/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/")
-    #analyze_one_project()
+    #analyze_all_samples(base_dir="/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/")
+    #analyze_one_project(PATH_PROJECT_ROOT, RESULT_PATH)

@@ -252,14 +252,14 @@ class PredicateWriter:
                 
         # 4) write out filtered nodes as JSONL
         os.makedirs(os.path.dirname(self.input_sink_path), exist_ok=True)
-        with open(self.input_sink_path, "w", encoding="utf-8") as fout:
+        with open(self.input_sink_path, "w", encoding="utf-8") as f:
             for n in sink_nodes:
-                fout.write(json.dumps(n) + "\n")
+                f.write(json.dumps(n) + "\n")
             print(f"Wrote {len(sink_nodes)} entries to {self.input_sink_path}")
         os.makedirs(os.path.dirname(self.input_source_path), exist_ok=True)
-        with open(self.input_source_path, "w", encoding="utf-8") as fout:
+        with open(self.input_source_path, "w", encoding="utf-8") as f:
             for n in source_nodes:
-                fout.write(json.dumps(n) + "\n")
+                f.write(json.dumps(n) + "\n")
             print(f"Wrote {len(source_nodes)} entries to {self.input_source_path}")
         return
 
