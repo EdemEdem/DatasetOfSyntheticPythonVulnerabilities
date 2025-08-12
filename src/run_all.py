@@ -68,7 +68,6 @@ def iter_projects(repo_root: pathlib.Path):
 
             # All good: yield both versions
             for version in ("vuln", "safe"):
-                print(version)
                 yield {
                     "project_root": str(version_dirs[version]),
                     "name": repo_dir.name,                      # e.g., "repos_3" or "repos_1-expression_evaluator"
@@ -101,7 +100,8 @@ if __name__ == "__main__":
         rerun_usage_prompting=False
         rerun_triage_prompting=False
         stop_after_usage_prompting=False
-        simulate_run=True
+        stop_after_dataflow_caluclation=False
+        simulate_run=False
     
         if cwe == "cwe89":
             analyzer = ProjectAnalyzer(
@@ -114,6 +114,7 @@ if __name__ == "__main__":
                 rerun_usage_prompting=rerun_usage_prompting,
                 rerun_triage_prompting=rerun_triage_prompting,
                 stop_after_usage_prompting=stop_after_usage_prompting,
+                stop_after_dataflow_caluclation=stop_after_dataflow_caluclation,
                 simulate_run=simulate_run)
             analyzer.run_pipeline()
         else:

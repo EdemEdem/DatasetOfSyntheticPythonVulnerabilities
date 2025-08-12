@@ -24,6 +24,7 @@ class ProjectAnalyzer:
         rerun_usage_prompting: bool = False,
         rerun_triage_prompting: bool = False,
         stop_after_usage_prompting: bool = False,
+        stop_after_dataflow_caluclation: bool = False,
         simulate_run: bool = False
         ):
         self.project_root = project_root
@@ -35,6 +36,7 @@ class ProjectAnalyzer:
         self.rerun_usage_prompting = rerun_usage_prompting
         self.rerun_triage_prompting = rerun_triage_prompting
         self.stop_after_usage_prompting=stop_after_usage_prompting
+        self.stop_after_dataflow_caluclation=stop_after_dataflow_caluclation
         self.simulate_run = simulate_run
         
         # Setup paths:
@@ -60,7 +62,7 @@ class ProjectAnalyzer:
         os.makedirs(self.spesification_result_dir, exist_ok=True)
 
         # Paths stage 2
-        self.codeQLruns_dir = project_output_dir / "codeQL_runs"
+        self.codeQLruns_dir = llm_results_dir / "codeQL_runs"
         os.makedirs(self.codeQLruns_dir, exist_ok=True)
         self.cql_output_sarif = self.codeQLruns_dir / f"{self.cwe}-query.sarif"
         self.cql_output_csv = self.codeQLruns_dir / f"{self.cwe}-query.csv"
@@ -217,6 +219,10 @@ class ProjectAnalyzer:
             print("Finished running codeQL")
         else:
             print("CodeQL-discovered dataflows exist")
+        if self.stop_after_dataflow_caluclation:
+            print("stop_after_dataflow_caluclation set to true")
+            print("Exiting")
+            return
         triage_analyzer = TriagePrompter(
             self.project_root,
             self.cql_output_sarif,
@@ -235,16 +241,17 @@ class ProjectAnalyzer:
             print(f"{self.model}-triaged dataflows already exist")
     
 if __name__ == "__main__":
-    project_root="C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/cwe89/repos_3/vuln"
-    name="SQLi_synth_4"
-    cql_db_path="C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/cql_dbs/cwe89/dbs_3/vuln-db"
+    project_root="C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/cwe89/repos_2/vuln"
+    name="cwe89_repos_2_vuln"
+    cql_db_path="C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/cql_dbs/cwe89/dbs_2/vuln-db"
     cwe="cwe89"
-    model="deepseek"
+    model="deepseek-reasoner"
     sanitizer_context = "parameterized queries"
     rerun_usage_prompting=False
-    rerun_triage_prompting=True
+    rerun_triage_prompting=False
     stop_after_usage_prompting=False
-    simulate_run = True
+    stop_after_dataflow_caluclation=False
+    simulate_run = False
     analyzer = ProjectAnalyzer(
         project_root=project_root,
         project_name=name,
@@ -255,6 +262,7 @@ if __name__ == "__main__":
         rerun_usage_prompting=rerun_usage_prompting,
         rerun_triage_prompting=rerun_triage_prompting,
         stop_after_usage_prompting=stop_after_usage_prompting,
+        stop_after_dataflow_caluclation=stop_after_dataflow_caluclation,
         simulate_run = simulate_run
 	)
     analyzer.run_pipeline()

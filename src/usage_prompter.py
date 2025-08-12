@@ -136,7 +136,7 @@ class UsagePrompter:
         api_key = os.getenv("DEEPSEEK_API_KEY")
         client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-reasoner",
             messages=[
                 {"role": "system", "content": src.prompt_templates.PACKAGE_PROMPT_SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
@@ -146,6 +146,15 @@ class UsagePrompter:
                 },
             stream=False
             )
+        try:
+            reasoning_content = response.choices[0].message.reasoning_content
+            reaonsing_content_file = pathlib.Path(self.output_dir) / "reasoning.txt"
+            with open(reaonsing_content_file,"a", encoding="utf-8", newline="\n") as f:
+                if reasoning_content and not reasoning_content.endswith("\n"):
+                    reasoning_content += "\n"
+                    f.write(reasoning_content)
+        except Exception:
+            pass
         return response.choices[0].message.content
     
     def load_prompts(self, dir_path):

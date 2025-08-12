@@ -65,7 +65,7 @@ class TriagePrompter:
 
         file_path = os.path.join(self.repo_path, uri)
         try:
-            with open(file_path, 'r') as f:
+            with open(file_path, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
         except IOError:
             print("Error during file read")
@@ -243,7 +243,7 @@ class TriagePrompter:
         Save the given prompt string to the specified file path.
         """
         try:
-            with open(file_path, 'w') as f:
+            with open(file_path, 'w', encoding='utf-8') as f:
                 f.write(prompt)
         except IOError as e:
             print(f"Error saving prompt to {file_path}: {e}", file=sys.stderr)
@@ -267,8 +267,6 @@ class TriagePrompter:
                     if self.prompt_dir:
                         flow_id = f"flow_{flow_counter}"
                         prompt_file = os.path.join(self.prompt_dir, f"{flow_id}.txt")
-                        print(self.prompt_dir)
-                        print(prompt_file)
                         self.save_prompt(prompt, prompt_file)
                     safe = self.ask_llm_if_flow_is_safe(prompt, f"{flow_id}.txt")
                     if not safe:

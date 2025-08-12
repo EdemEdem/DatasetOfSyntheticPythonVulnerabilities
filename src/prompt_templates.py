@@ -22,8 +22,11 @@ foo qux
 EXAMPLE JSON OUTPUT:
 {
   "foo bar": "none",
-  "foo baz": "sink",
-  "foo qux": "source"
+  "foo bar quux": "none",
+  "foo bar quux baz": "sink",
+  "foo corge": "none",
+  "foo grault": "sink",
+  "foo grault plugh": "source"
 }
 """
 
