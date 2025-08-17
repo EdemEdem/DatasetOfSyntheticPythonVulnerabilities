@@ -588,7 +588,7 @@ def analyze_with_tags(root_path):
             elif base and base in self.import_chains:
                 for base_chain in self.import_chains[base]:
                     node_chain = self.extract_chain(node)
-                    full_chain = base_chain[:] + node_chain
+                    full_chain = base_chain + node_chain[1:]
                     #if the base node is the package-name, dont extract the chain of the package node
                     if base == base_chain[0]:
                         full_chain = node_chain

@@ -5,6 +5,7 @@ import sys
 import json
 import subprocess as sp
 import re
+import src.cwe_context as sani_cont
 
 from src.project_analyzer import ProjectAnalyzer
 
@@ -95,16 +96,26 @@ if __name__ == "__main__":
         name = f"{cwe}_{cfg["name"]}_{version}"
 
         found += 1
-        model="deepseek"
-        sanitizer_context = "parameterized queries"
+        model="deepseek-reasoner"
+        sanitizer_context = ""
         rerun_usage_prompting=False
         rerun_triage_prompting=False
         stop_after_usage_prompting=False
         stop_after_dataflow_caluclation=False
         simulate_run=False
-    
+        if cwe == "cwe78":
+            continue
         if cwe == "cwe89":
-            analyzer = ProjectAnalyzer(
+            continue
+    
+        if cwe == "cwe79":
+            if project_id == "2":
+                print("skipping cwe78_2, pipeline can't handle the root having subdirs atm")
+                continue
+            sanitizer_context = sani_cont.cwe79
+        if cwe == "cwe94":
+            sanitizer_context = sani_cont.cwe94
+        analyzer = ProjectAnalyzer(
                 project_root=project_root,
                 project_name=name,
                 cql_db_path=cql_db_path,
@@ -116,9 +127,7 @@ if __name__ == "__main__":
                 stop_after_usage_prompting=stop_after_usage_prompting,
                 stop_after_dataflow_caluclation=stop_after_dataflow_caluclation,
                 simulate_run=simulate_run)
-            analyzer.run_pipeline()
-        else:
-            print(f"skipping project: {name} ,  because cwe is {cwe}")
+        analyzer.run_pipeline()
 
 
     if found == 0:

@@ -238,7 +238,7 @@ class ProjectAnalyzer:
             self.clear_directory(self.triage_results_dir)
             triage_analyzer.build_and_run_triage_prompts()
         else:
-            print(f"{self.model}-triaged dataflows already exist")
+            print(f"{self.model}-triaged dataflows already exist at {self.filtred_sarif_path}")
     
 if __name__ == "__main__":
     project_root="C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/cwe89/repos_2/vuln"
