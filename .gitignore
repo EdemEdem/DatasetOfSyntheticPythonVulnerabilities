@@ -17,3 +17,9 @@ legacy*
 
 samples/package_extractor_results/cwe*/*
 samples/llm_results*
+
+cwe_average_accuracy_metrics*
+average_accuracy_metrics*
+accuracy_metrics*
+vulnerability_judgments*
+result_calculation_template*

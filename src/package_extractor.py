@@ -6,11 +6,11 @@ import json
 from collections import defaultdict
 
 # Adjust this to your project root
-PROJECT_CWE = "cwe89"
+PROJECT_CWE = "cwe79"
 PROJECT_REPO = "repos_3"
 PROJECT_STATE = "vuln"
 PATH_PROJECT_ROOT = f"/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/{PROJECT_CWE}/{PROJECT_REPO}/{PROJECT_STATE}"
-RESULT_PATH = f"C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/package_extractor_results/{PROJECT_CWE}/{PROJECT_REPO}/{PROJECT_STATE}/usages_test.jsonl"
+RESULT_PATH = f"C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/package_extractor_results/{PROJECT_CWE}/{PROJECT_REPO}/{PROJECT_STATE}/usages.jsonl"
 
 
 def discover_internal_modules(root_path):
@@ -149,6 +149,58 @@ def analyze_with_tags(root_path):
             if isinstance(node,ast.Name):
                 chain.insert(0,node.id)
             return chain
+        
+        def record_call(self, node, full_chain, package, base):
+            self.records.append({
+                "file":self.current_file,"lineno":node.lineno,"col":node.col_offset,
+                "node_type":"Call",
+                "chain":full_chain,
+                "package":package,
+                "code":self.lines[node.lineno-1].strip(),
+                "tags":sorted(self.env[base]),"call_id":self.call_counter
+                })
+            for idx, arg in enumerate(node.args):
+                expr=arg
+                kind="arg"
+                # *args
+                if isinstance(arg, ast.Starred):
+                    expr = arg.value
+                    kind = "arg_starred"
+                expr_chain = self.extract_chain(expr)
+                self.records.append({
+                    "file":self.current_file,
+                    "lineno":arg.lineno,
+                    "col":arg.col_offset,
+                    "node_type":kind,
+                    "chain":full_chain,
+                    "package":package,
+                    "code":self.lines[arg.lineno-1].strip(),
+                    "tags":sorted(self.env[base]),
+                    "arg_pos":idx,
+                    "call_id":self.call_counter,
+                    "expr_chain":expr_chain
+                    })
+            for idx, kw in enumerate(node.keywords):
+                # kw.arg is a string or None (None means **kwargs)
+                expr = kw.value
+                expr_chain = self.extract_chain(expr)
+                line = getattr(kw, "lineno", getattr(expr, "lineno", node.lineno))
+                col = getattr(kw, "col_offset", getattr(expr, "col_offset", node.col_offset))
+                kind = "kwarg" if kw.arg is not None else "kwarg_doublestar"
+                self.records.append({
+                    "file": self.current_file,
+                    "lineno": line,
+                    "col": col,
+                    "node_type": kind,
+                    "chain": full_chain,
+                    "package": package,
+                    "code": self.lines[line - 1].strip(),
+                    "tags": sorted(self.env[base]),
+                    "kw_name": kw.arg,
+                    "call_id": self.call_counter,
+                    "expr_chain": expr_chain
+                    })
+            return
 
         def visit_FunctionDef(self, node):
             # Handle decorated endpoints: forward decorator import chains to params
@@ -460,7 +512,7 @@ def analyze_with_tags(root_path):
                             if base != c[-1]:
                                 new_chain = c[:] + [func.id]
                                 print("[WARNING] Direct call to imported function, and call-name's chain does not end in the call-name")
-                                print(f"This sciprt's output-file might not be a correct implementation. Check chains similar to {new_chain}")
+                                print(f"This sciprt's output-file might not be a correct description of how libraries are used in the project. Check chains similar to {new_chain} and confirm no duplicates or missing nodes")
                             self.project_chains[tgt].append(new_chain)
                             self.type_chains[tgt].append("call")
                     
@@ -482,7 +534,7 @@ def analyze_with_tags(root_path):
                                 self.type_chains[tgt].append(node_type)
                         elif base in self.import_chains:
                             for c in self.import_chains[base]:
-                                new_chain = c[:] + self.extract_chain(val)
+                                new_chain = c[:] + self.extract_chain(val)[1:]
                                 self.project_chains[tgt].append(new_chain)
                                 self.type_chains[tgt].append(node_type)
                                 
@@ -494,75 +546,34 @@ def analyze_with_tags(root_path):
             self.call_counter += 1
             if isinstance(func, ast.Attribute):
                 self.skip_attrs.add(func)
-                base=self.extract_base(func); #method=func.attr
+                base=self.extract_base(func) #method=func.attr
                 node_chain = self.extract_chain(func)
                 if base in self.project_chains:
-                    for bc in self.project_chains[base]:
-                        fc=bc[:] + node_chain[1:]
-                        pkg=bc[0]
-                        self.records.append({"file":self.current_file,"lineno":node.lineno,"col":node.col_offset,
-                                             "node_type":"Call","chain":fc,"package":pkg,
-                                             "code":self.lines[node.lineno-1].strip(),
-                                             "tags":sorted(self.env[base]),"call_id":self.call_counter})
-                        #Adding arguments to the records
-                        for idx, arg in enumerate(node.args):
-                            expr_chain = self.extract_chain(arg)
-                            self.records.append({"file":self.current_file,"lineno":arg.lineno,"col":arg.col_offset,
-                                             "node_type":"arg","chain":fc,"package":pkg,
-                                             "code":self.lines[arg.lineno-1].strip(),
-                                             "tags":sorted(self.env[base]), "arg_pos":idx,"call_id":self.call_counter,
-                                             "expr_chain":expr_chain})       
+                    for base_chain in self.project_chains[base]:
+                        full_chain=base_chain[:] + node_chain[1:]
+                        pkg=base_chain[0]
+                        self.record_call(node=node, full_chain=full_chain, package=pkg, base=base)
                 # Case: when some variable has the same name as an imported one. Since I think the project variable will override
                 elif base in self.import_chains:
-                    for bc in self.import_chains[base]:
-                        fc=bc[:] + node_chain
-                        pkg=bc[0]
-                        if bc[0] == base:
-                            fc = node_chain
-                        self.records.append({"file":self.current_file,"lineno":node.lineno,"col":node.col_offset,
-                                             "node_type":"Call","chain":fc,"package":pkg,
-                                             "code":self.lines[node.lineno-1].strip(),
-                                             "tags":sorted(self.env[base]),"call_id":self.call_counter})
-                        for idx, arg in enumerate(node.args):
-                            expr_chain = self.extract_chain(arg)
-                            self.records.append({"file":self.current_file,"lineno":arg.lineno,"col":arg.col_offset,
-                                             "node_type":"arg","chain":fc,"package":pkg,
-                                             "code":self.lines[arg.lineno-1].strip(),
-                                             "tags":sorted(self.env[base]), "arg_pos":idx,"call_id":self.call_counter,
-                                             "expr_chain":expr_chain})
+                    for base_chain in self.import_chains[base]:
+                        full_chain=base_chain[:] + node_chain
+                        pkg=base_chain[0]
+                        if base_chain[0] == base:
+                            full_chain = node_chain
+                        self.record_call(node=node, full_chain=full_chain, package=pkg, base=base)
             #A direct call (i.e not a method as above)  since the func node is an ast.Name  
             #func.id is now the base node as it's the only node
             elif isinstance(func,ast.Name) and func.id in self.import_chains:
                 for base_chain in self.import_chains[func.id]:
                     fc = base_chain
                     pkg=base_chain[0]
-                    self.records.append({"file":self.current_file,"lineno":node.lineno,"col":node.col_offset,
-                        "node_type":"Call","chain":fc,"package":pkg,
-                        "code":self.lines[node.lineno-1].strip(),
-                        "tags":sorted(self.env[func.id]),"call_id":self.call_counter})
-                    for idx, arg in enumerate(node.args):
-                        expr_chain = self.extract_chain(arg)
-                        self.records.append({"file":self.current_file,"lineno":arg.lineno,"col":arg.col_offset,
-                                             "node_type":"arg","chain":fc,"package":pkg,
-                                             "code":self.lines[arg.lineno-1].strip(),
-                                             "tags":sorted(self.env[func.id]), "arg_pos":idx,"call_id":self.call_counter,
-                                             "expr_chain":expr_chain})
+                    self.record_call(node=node, full_chain=fc, package=pkg, base=func.id)
             ###If it's a wrapper function
             elif isinstance(func,ast.Name) and func.id in self.project_chains:
                 for base_chain in self.project_chains[func.id]:
                     fc = base_chain
                     pkg=base_chain[0]
-                    self.records.append({"file":self.current_file,"lineno":node.lineno,"col":node.col_offset,
-                        "node_type":"Call","chain":fc,"package":pkg,
-                        "code":self.lines[node.lineno-1].strip(),
-                        "tags":sorted(self.env[func.id]),"call_id":self.call_counter})
-                    for idx, arg in enumerate(node.args):
-                        expr_chain = self.extract_chain(arg)
-                        self.records.append({"file":self.current_file,"lineno":arg.lineno,"col":arg.col_offset,
-                                             "node_type":"arg","chain":fc,"package":pkg,
-                                             "code":self.lines[arg.lineno-1].strip(),
-                                             "tags":sorted(self.env[func.id]), "arg_pos":idx,"call_id":self.call_counter,
-                                             "expr_chain":expr_chain})
+                    self.record_call(node=node, full_chain=fc, package=pkg, base=func.id)
                     
             self.generic_visit(node)
             
@@ -677,4 +688,4 @@ if __name__ == "__main__":
     print("External imports:", sorted(external_imports))
     
     #analyze_all_samples(base_dir="/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/")
-    #analyze_one_project(PATH_PROJECT_ROOT, RESULT_PATH)
+    analyze_one_project(PATH_PROJECT_ROOT, RESULT_PATH)
