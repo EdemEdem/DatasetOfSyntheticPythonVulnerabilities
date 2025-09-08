@@ -1,0 +1,14 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<h1>Add New Formula</h1>
+<form method="post">
+  <label for="name">Name:</label>
+  <input type="text" id="name" name="name" required><br>
+
+  <label for="body">Formula:</label>
+  <input type="text" id="body" name="body" required><br>
+
+  <button type="submit">Submit</button>
+</form>
+{% endblock %}

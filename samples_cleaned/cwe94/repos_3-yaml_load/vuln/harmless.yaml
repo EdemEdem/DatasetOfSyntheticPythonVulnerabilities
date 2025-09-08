@@ -1,0 +1,5 @@
+tasks:
+  - name: cleanup
+    action: "print('Cleaning up...')"
+  - name: greet
+    action: "print('Hello World!')"

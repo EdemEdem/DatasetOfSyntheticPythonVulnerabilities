@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Blog Post</title>
+</head>
+<body>
+    <h1>Leave a Comment</h1>
+    <form method="post">
+        <textarea name="comment" rows="4" cols="50"></textarea><br>
+        <button type="submit">Submit Comment</button>
+    </form>
+
+    <h2>Latest Comment</h2>
+    <!-- ✗ Sink: Jinja2 will render any HTML/JS in comment -->
+    <p>{{ comment }}</p>
+</body>
+</html>

@@ -1,0 +1,16 @@
+{% extends 'layout.html' %}
+
+{% block content %}
+<h1>Formulas</h1>
+<a href="{{ url_for('new_formula') }}">Add New Formula</a>
+<ul>
+  {% for f in formulas %}
+    <li>
+      <strong>{{ f['name'] }}</strong>: {{ f['body'] }}
+      <form action="{{ url_for('run', name=f['name']) }}" method="post" style="display:inline;">
+        <button type="submit">Run</button>
+      </form>
+    </li>
+  {% endfor %}
+</ul>
+{% endblock %}

@@ -1,0 +1,21 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Directory Browser (Vulnerable)</title>
+</head>
+<body>
+    <h1>Directory Browser (Vulnerable)</h1>
+    <form method="get">
+        <label for="path">Path:</label>
+        <input type="text" id="path" name="path" value="{{ path|default_if_none:'' }}" size="60">
+        <button type="submit">List</button>
+    </form>
+
+    {% if output %}
+        <h2>Contents of {{ path }}</h2>
+        <pre>{{ output }}</pre>
+    {% endif %}
+</body>
+</html>
+

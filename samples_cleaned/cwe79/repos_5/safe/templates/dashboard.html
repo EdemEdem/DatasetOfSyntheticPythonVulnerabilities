@@ -1,0 +1,17 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Feedback Dashboard </title>
+</head>
+<body>
+    <h1>All Feedback</h1>
+    <ul>
+    {% for fb in feedback_list %}
+        {# fb is already escaped in SubmitHandler #}
+        <li>{{ fb }}</li>
+    {% end %}
+    </ul>
+    <p><a href="/">Submit more feedback</a></p>
+</body>
+</html>
