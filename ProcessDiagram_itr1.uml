@@ -1,0 +1,65 @@
+@startuml
+title LLM-Augmented Static Analysis (Python, CWE)
+
+skinparam dpi 160
+skinparam shadowing false
+skinparam defaultTextAlignment center
+skinparam ArrowColor Black
+
+' Base look
+skinparam rectangle {
+  RoundCorner 14
+  BackgroundColor White
+  BorderColor Black
+}
+skinparam note {
+  BackgroundColor #fff8c5
+  BorderColor #e1c542
+}
+
+' Stereotype-based styles (portable)
+skinparam rectangle<<codeql>> {
+  BackgroundColor #e9f3ff
+}
+skinparam rectangle<<llm>> {
+  BackgroundColor #e9f9ee
+}
+skinparam rectangle<<deemp>> {
+  BackgroundColor #f7f7f7
+  LineStyle Dashed
+}
+
+' Legend
+rectangle "CodeQL" as LEG1 #lightblue
+rectangle "LLM" as LEG2 #lightgreen
+LEG1 -[hidden]-> LEG2
+
+' Nodes
+rectangle "Input\n<b>Python Project</b>" as INP
+rectangle "Step 0\nCodeQL DB" as S0 #lightblue
+rectangle "Step 1\nSource and Sink Candidate Extraction \nStatic Analysis\n(AST → attr chains)" as S1 #cornflowerblue
+rectangle "Step 2\nSource/Sink Spec" as S2 #lightgreen
+rectangle "Step 3\nTaint Flow Discovery" as S3 #lightblue
+rectangle "Step 4\nVuln Check" as S4 #lightgreen
+rectangle "Output\n<b>Confirmed Vulnerable Flows</b>" as OUT
+
+' Compact artifacts
+rectangle "📜 Node list\n+ attr chains" as A1
+rectangle "📜 Source/Sink\nlabels (per CWE)" as A2
+rectangle "📜 Taint\nflows" as A3
+rectangle "📜 Verdicts\n(true vuln / sanitized)" as A4
+
+' Flow
+INP --> S0
+S0 --> S1
+S1 --> S2 : attr chains
+S2 --> S3 : src/sink spec
+S3 --> S4 : flows + snippets
+S4 --> OUT : LLM verdict
+
+' Artifact anchors
+S1 -down-> A1
+S2 -down-> A2
+S3 -down-> A3
+S4 -down-> A4
+@enduml
