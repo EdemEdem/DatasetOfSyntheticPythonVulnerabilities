@@ -1,0 +1,30 @@
+<!-- flask_ping_safe/templates/ping.html -->
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <title>Ping Utility</title>
+  </head>
+  <body>
+    <h1>Ping a Host</h1>
+    {% with messages = get_flashed_messages() %}
+      {% if messages %}
+        <ul style="color: red;">
+          {% for msg in messages %}
+            <li>{{ msg }}</li>
+          {% endfor %}
+        </ul>
+      {% endif %}
+    {% endwith %}
+    <form method="post">
+      <label for="host">Host or IP:</label>
+      <input type="text" name="host" id="host" placeholder="example.com">
+      <button type="submit">Ping</button>
+    </form>
+
+    {% if result %}
+      <h2>Output:</h2>
+      <pre>{{ result }}</pre>
+    {% endif %}
+  </body>
+</html>
