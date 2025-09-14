@@ -21,8 +21,11 @@ class ProjectAnalyzer:
         cwe: str,
         model: str,
         sanitizer_context: str,
+        rerun_package_extraction: bool=True,
         rerun_usage_prompting: bool = False,
+        rerun_cql_dataflow_discovery: bool = False,
         rerun_triage_prompting: bool = False,
+        stop_after_package_extraction: bool = False,
         stop_after_usage_prompting: bool = False,
         stop_after_dataflow_caluclation: bool = False,
         simulate_run: bool = False
@@ -33,8 +36,11 @@ class ProjectAnalyzer:
         self.cwe = cwe
         self.model = model
         self.sanitizer_context = sanitizer_context
+        self.rerun_package_extraction = rerun_package_extraction
         self.rerun_usage_prompting = rerun_usage_prompting
+        self.rerun_cql_dataflow_discovery = rerun_cql_dataflow_discovery
         self.rerun_triage_prompting = rerun_triage_prompting
+        self.stop_after_package_extraction = stop_after_package_extraction
         self.stop_after_usage_prompting=stop_after_usage_prompting
         self.stop_after_dataflow_caluclation=stop_after_dataflow_caluclation
         self.simulate_run = simulate_run
@@ -159,14 +165,17 @@ class ProjectAnalyzer:
         if not os.path.isdir(self.project_root):
             print(f"could not find root at : {self.project_root}")
             return
-        if not os.path.isfile(self.package_origin_analysis_jsonl):
+        if not os.path.isfile(self.package_origin_analysis_jsonl) or self.rerun_package_extraction:
             print("Analyzing package origin ...")
             extract_external_imports_to_file(self.project_root, self.package_origin_analysis_jsonl)
-        if not os.path.isfile(self.package_analysis_raw_jsonl):
+        if not os.path.isfile(self.package_analysis_raw_jsonl) or self.rerun_package_extraction:
             print("Analyzing packages ...")
             analyze_one_project(self.project_root, self.package_analysis_raw_jsonl)
-        if not os.path.isfile(self.package_analysis_result_jsonl):
+        if not os.path.isfile(self.package_analysis_result_jsonl) or self.rerun_package_extraction:
             self.filter_internal_packages()
+        if self.stop_after_package_extraction:
+            print("Stopping after package extraction")
+            return
         # Query LLM
         usage_analyzer = UsagePrompter(
             specifications_json_path = self.package_analysis_result_jsonl,
@@ -174,8 +183,9 @@ class ProjectAnalyzer:
             spesification_result_dir = self.spesification_result_dir,
             cwe=self.cwe,
             cwe_context= "")
-        #checking if this step is already completed
+        
         if self.rerun_usage_prompting:
+            print("Rerunning usage prompting, clearing old results ...")
             self.clear_directory(self.codeQLruns_dir)
             self.clear_directory(self.usage_pormpts_dir)
             self.clear_directory(self.spesification_result_dir)
@@ -189,12 +199,17 @@ class ProjectAnalyzer:
             if os.path.getsize(self.package_analysis_sinks_jsonl) > 0:
                 print("LLM specified sinks already exist")
                 specification_exists = True
-        
+                
+        ran_usage_prompting = False
         if not specification_exists or self.rerun_usage_prompting:
             usage_analyzer.save_prompts()
             print("Finished saving prompts")
             usage_analyzer.run_prompts()
             print("Finished runnig prompts")
+            ran_usage_prompting = True
+            
+        if ran_usage_prompting or self.rerun_cql_dataflow_discovery:
+            print("Writing predicates ...")
             predicate_writer = PredicateWriter(
                 input_source_path = self.package_analysis_sources_jsonl,
                 input_sink_path = self.package_analysis_sinks_jsonl,
@@ -213,7 +228,7 @@ class ProjectAnalyzer:
             print("Exiting run")
             return
         
-        if not os.path.isfile(self.cql_output_sarif):
+        if not os.path.isfile(self.cql_output_sarif) or self.rerun_cql_dataflow_discovery:
             print("Starting codeQL run")
             self.find_data_flows_for_cwe()
             print("Finished running codeQL")
@@ -223,16 +238,19 @@ class ProjectAnalyzer:
             print("stop_after_dataflow_caluclation set to true")
             print("Exiting")
             return
-        triage_analyzer = TriagePrompter(
-            self.project_root,
-            self.cql_output_sarif,
-            self.filtred_sarif_path,
-            self.triage_pormpts_dir,
-            self.triage_results_dir,
-            self.cwe,
-            self.sanitizer_context
-		)
         if not os.path.isfile(self.filtred_sarif_path) or self.rerun_triage_prompting:
+            triage_analyzer = TriagePrompter(
+                self.project_root,
+                self.cql_output_sarif,
+                self.filtred_sarif_path,
+                self.triage_pormpts_dir,
+                self.triage_results_dir,
+                self.cwe,
+                self.sanitizer_context,
+                context_lines_top=1,
+                context_lines_bottom=1,
+                gap_limit_between_steps=1
+                )
             self.clear_directory(self.triage_pormpts_dir)
             self.clear_directory(self.triage_flows_dir)
             self.clear_directory(self.triage_results_dir)
@@ -241,14 +259,22 @@ class ProjectAnalyzer:
             print(f"{self.model}-triaged dataflows already exist at {self.filtred_sarif_path}")
     
 if __name__ == "__main__":
-    project_root="C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/cwe89/repos_2/vuln"
-    name="cwe89_repos_2_vuln"
-    cql_db_path="C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/cql_dbs/cwe89/dbs_2/vuln-db"
-    cwe="cwe89"
+     # Example usage
+    cwe="cwe79"
+    identifier="1"
+    version="vuln"
+    
+    # Define paths and parameters
+    project_root=f"C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/{cwe}/repos_{identifier}/{version}"
+    name=f"{cwe}_repos_{identifier}_{version}"
+    cql_db_path=f"C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/cql_dbs/{cwe}/dbs_{identifier}/{version}-db"
     model="deepseek-reasoner"
     sanitizer_context = "parameterized queries"
+    rerun_package_extraction=False
     rerun_usage_prompting=False
-    rerun_triage_prompting=False
+    rerun_cql_dataflow_discovery=False
+    rerun_triage_prompting=True
+    stop_after_package_extraction=False
     stop_after_usage_prompting=False
     stop_after_dataflow_caluclation=False
     simulate_run = False
@@ -259,8 +285,11 @@ if __name__ == "__main__":
         cwe=cwe,
         model=model,
         sanitizer_context = sanitizer_context,
+        rerun_package_extraction=rerun_package_extraction,
         rerun_usage_prompting=rerun_usage_prompting,
+        rerun_cql_dataflow_discovery=rerun_cql_dataflow_discovery,
         rerun_triage_prompting=rerun_triage_prompting,
+        stop_after_package_extraction=stop_after_package_extraction,
         stop_after_usage_prompting=stop_after_usage_prompting,
         stop_after_dataflow_caluclation=stop_after_dataflow_caluclation,
         simulate_run = simulate_run

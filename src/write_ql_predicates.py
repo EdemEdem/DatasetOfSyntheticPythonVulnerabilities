@@ -41,8 +41,12 @@ QL_method_call_sink_body ="""\
     (
         call.getLocation().getFile().getAbsolutePath().matches("%{filepath}%") and
         call.getLocation().getStartLine() = {startline} and
-        call.getFunc() instanceof Attribute and
-        call.getFunc().(Attribute).getName().matches("{node_name}")
+        exists(Expr f | call.getFunc() = f and
+			(
+				f instanceof Name and f.(Name).getId() = "{node_name}" or
+				f instanceof Attribute and f.(Attribute).getAttr() = "{node_name}"
+			)
+		)
     )
     """
 QL_method_call_arg_sink_body ="""\
@@ -50,13 +54,22 @@ QL_method_call_arg_sink_body ="""\
 		expr.getLocation().getFile().getAbsolutePath().matches("%{filepath}%") and
 		expr.getLocation().getStartLine() = {startline} and
 		exists( Call call |
-			call.getLocation().getFile().getAbsolutePath().matches("%{filepath}%") and
-			call.getLocation().getStartLine() = {startline_call} and
-			call.getFunc().(Attribute).getName().matches("{call_name}") and
+			isLLMDetectedSinkFunctionCall(call) and
 			expr = call.getArg({arg_pos})
 		)
 	)
     """
+QL_method_call_kwarg_sink_body ="""\
+    (
+		kw.getLocation().getFile().getAbsolutePath().matches("%{filepath}%") and
+		kw.getLocation().getStartLine() = {startline} and
+		kw.getArg() = {kw_name} and
+		exists( Call call |
+			isLLMDetectedSinkFunctionCall(call) and
+			call.contains(kw)
+        )
+    )
+"""
 QL_sink_predicate ="""\
     import python
     predicate isLLMDetectedSinkFunctionCall(Call call) {{
@@ -64,8 +77,12 @@ QL_sink_predicate ="""\
 	}}
     
     predicate isLLMDetectedSinkFunctionArg(Expr expr) {{
-	{arg_sinks_body}	
-	}}
+    {arg_sinks_body}
+    }}
+    
+    predicate isLLMDetectedSinkFunctionKwarg(Keyword kw) {{
+    {kwarg_sinks_body}
+    }}
     """
 class PredicateWriter:
     def __init__(self,
@@ -154,6 +171,7 @@ class PredicateWriter:
         node_dicts = self.read_sink_inputs()
         call_fragments = []
         arg_fragments = []
+        kwarg_fragments = []
         for node_dict in node_dicts:
             node_name = node_dict["chain"][-1]
             node_type = node_dict["node_type"]
@@ -183,16 +201,35 @@ class PredicateWriter:
                         arg_pos=arg_pos
                         )
                     )
+            if node_type == "kwarg":
+                call_node = self.get_call_from_id(node_dict["call_id"], node_dicts)
+                call_name = call_node["chain"][-1]
+                startline_call = call_node["lineno"]
+                kwarg_fragments.append(
+                    QL_method_call_kwarg_sink_body.format(
+                        filepath=filepath,
+                        startline=line,
+                        node_name=node_name,
+                        call_name=call_name,
+                        startline_call=startline_call,
+                        kw_name=f'"{node_dict["kw_name"]}"'
+                        )
+                    )
         sink_calls = " or ".join(call_fragments)
         sink_args = " or ".join(arg_fragments)
+        sink_kwargs = " or ".join(kwarg_fragments)
+        
         if not sink_calls:
             sink_calls = "1=0"
         if not sink_args:
             sink_args = "1=0"
+        if not sink_kwargs:
+            sink_kwargs = "1=0"
         
         return QL_sink_predicate.format(
             call_sinks_body=sink_calls,
-            arg_sinks_body=sink_args
+            arg_sinks_body=sink_args,
+            kwarg_sinks_body=sink_kwargs
             )
 
     def read_sink_inputs(self):

@@ -100,6 +100,7 @@ if __name__ == "__main__":
         sanitizer_context = ""
         rerun_usage_prompting=False
         rerun_triage_prompting=False
+        stop_after_package_extraction=False
         stop_after_usage_prompting=False
         stop_after_dataflow_caluclation=False
         simulate_run=False
@@ -124,6 +125,7 @@ if __name__ == "__main__":
                 sanitizer_context = sanitizer_context,
                 rerun_usage_prompting=rerun_usage_prompting,
                 rerun_triage_prompting=rerun_triage_prompting,
+                stop_after_package_extraction=stop_after_package_extraction,
                 stop_after_usage_prompting=stop_after_usage_prompting,
                 stop_after_dataflow_caluclation=stop_after_dataflow_caluclation,
                 simulate_run=simulate_run)

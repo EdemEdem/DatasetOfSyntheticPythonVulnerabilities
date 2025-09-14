@@ -39,10 +39,10 @@ FROM_IMPORT_RE = re.compile(
 
 #from query_llms import LLMClient
 
-CONTEXT_LINES = 2
+#CONTEXT_LINES = 2
 
 class TriagePrompter:
-    def __init__(self, repo_path: str, sarif_path: str, filtred_sarif_path: str, prompt_dir: str, result_dir: str, cwe: str, sanitizer_context: str):
+    def __init__(self, repo_path: str, sarif_path: str, filtred_sarif_path: str, prompt_dir: str, result_dir: str, cwe: str, sanitizer_context: str, context_lines_top: int = 1, context_lines_bottom: int = 1, gap_limit_between_steps: int = 1):
         self.repo_path = repo_path
         self.sarif_path = sarif_path
         self.filtred_sarif_path = filtred_sarif_path
@@ -50,8 +50,11 @@ class TriagePrompter:
         self.result_dir = result_dir
         self.cwe = cwe
         self.sanitizer_context = sanitizer_context
+        self.context_lines_top = context_lines_top
+        self.context_lines_bottom = context_lines_bottom
+        self.gap_limit_between_steps = gap_limit_between_steps
 
-    def extract_code(self, location: dict, context_lines_top=CONTEXT_LINES, context_lines_bottom=CONTEXT_LINES) -> str:
+    def extract_code(self, location: dict, context_lines_top, context_lines_bottom) -> str:
         """
         Given a SARIF location object, read the file from disk and return the code snippet
         including CONTEXT_LINES before and after the region.
@@ -76,7 +79,7 @@ class TriagePrompter:
         numbered_lines = []
         for idx, line in enumerate(snippet_lines, start=start):
             # include the line break from the original line
-            numbered_lines.append(f"{idx}: {line}")
+            numbered_lines.append(f"{idx}: {line}")     
         return ''.join(numbered_lines)
 
     
@@ -95,7 +98,7 @@ class TriagePrompter:
             else:
                 block_parts.append(self.extract_code(loc, 0,0))
             lastloc = loc
-        #add two trailing lines for context
+        #add trailing lines for context
         try:
             block_parts.append(self.extract_code(lastloc,-1,gap_end))
         except Exception:
@@ -137,7 +140,7 @@ class TriagePrompter:
             # if everything was an import, maybe fall back to original?
             print("Empty after filtering")
             print(filtered)
-            filtered = [(loc, self.extract_code(loc)) for loc in locs]
+            filtered = [(loc, self.extract_code(loc, self.context_lines_top, self.context_lines_bottom)) for loc in locs]
 
         
         parts = []
@@ -149,13 +152,14 @@ class TriagePrompter:
         parts.append(source)
         all_locs = [loc for loc,_ in filtered]
         step_nodes = all_locs[1:-1]
-        blocks = self.find_blocks(step_nodes, 1)
+        # group step nodes into blocks with no more than {gap_limit_between_steps} line gaps
+        blocks = self.find_blocks(step_nodes, self.gap_limit_between_steps)
         for idx, block in enumerate(blocks):
             startloc = block[0]['location']['physicalLocation']['region']['startLine']
             uri = block[0]['location']['physicalLocation']['artifactLocation']['uri']            
             step = f"[STEP {idx+1}] {uri}:{startloc}\n"
             parts.append(step)
-            parts.append(self.extract_block_lines(block,1,0))
+            parts.append(self.extract_block_lines(block,self.context_lines_top,self.context_lines_bottom))
 
         sink_code = filtered[-1][1]
         sink_phys_loc = filtered[-1][0]["location"]['physicalLocation']
