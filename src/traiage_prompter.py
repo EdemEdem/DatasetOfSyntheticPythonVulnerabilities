@@ -11,6 +11,7 @@ import os
 import sys
 import pathlib
 import re
+from urllib.parse import urlsplit, unquote
 from openai import OpenAI
 from dotenv import load_dotenv
 from src.prompt_templates import FLOW_PROMPT_SYSTEM_PROMPT
@@ -36,6 +37,8 @@ FROM_IMPORT_RE = re.compile(
     r'\s*(?:#.*)?$'     # optional trailing comment
 )
 
+_WIN_ABS_RE = re.compile(r'^(?:[a-zA-Z]:[\\/]|\\\\[^\\\/]+[\\\/][^\\\/]+)')
+
 
 #from query_llms import LLMClient
 
@@ -53,6 +56,45 @@ class TriagePrompter:
         self.context_lines_top = context_lines_top
         self.context_lines_bottom = context_lines_bottom
         self.gap_limit_between_steps = gap_limit_between_steps
+    
+    @staticmethod
+    def _from_file_uri(uri: str) -> str:
+        """Convert file: URI to a local path (handles Windows + POSIX)."""
+        s = urlsplit(uri)
+        if s.scheme != 'file':
+            return uri
+
+        # UNC: file://server/share/path
+        if s.netloc and s.netloc.lower() not in ('', 'localhost'):
+            path = f"\\\\{s.netloc}{s.path}"
+            return unquote(path.replace('/', '\\'))
+
+        # Local path (percent-decoded)
+        path = unquote(s.path)
+
+        # Windows drive path like /C:/dir/file  -> C:\dir\file
+        if re.match(r'^/[a-zA-Z]:', path):
+            return path[1:].replace('/', '\\')
+
+        # POSIX absolute path like /usr/bin/ls
+        return path
+
+    def format_path(self, uri: str) -> str:
+        """
+        If `uri` is absolute (POSIX, Windows drive, or UNC), return it as-is (normalized).
+        Otherwise, join it with `self.repo_path`.
+        """
+        if not uri:
+            return self.repo_path
+
+        # Normalize file: URIs to local paths first
+        if uri.lower().startswith('file:'):
+            uri = self._from_file_uri(uri)
+
+        if os.path.isabs(uri) or _WIN_ABS_RE.match(uri):
+            return os.path.normpath(uri)
+
+        return os.path.normpath(os.path.join(self.repo_path, uri))
 
     def extract_code(self, location: dict, context_lines_top, context_lines_bottom) -> str:
         """
@@ -66,12 +108,16 @@ class TriagePrompter:
         end = region.get('endLine', region['startLine']) + context_lines_bottom
     
 
-        file_path = os.path.join(self.repo_path, uri)
+#        file_path = os.path.join(self.repo_path, uri)
+        file_path = self.format_path(uri)
         try:
             with open(file_path, 'r', encoding='utf-8') as f:
                 lines = f.readlines()
-        except IOError:
+        except IOError as e:
             print("Error during file read")
+            print(f"file_path was {file_path}")
+            print(e)
+            
             return f"# Unable to read file: {uri}\n"
 
         snippet_lines = lines[start - 1:end]
@@ -169,7 +215,7 @@ class TriagePrompter:
         parts.append(sink)
 
         body = "\n".join(parts)
-        question = f"\nQuestion: Is this dataflow safe with respect to {self.cwe}? Answer YES or NO."
+        question = f"\nQuestion: Is this dataflow vulnerable to {self.cwe}? Answer YES or NO."
         return body + question
     
     def find_blocks(self, node_locs, gap) -> list:

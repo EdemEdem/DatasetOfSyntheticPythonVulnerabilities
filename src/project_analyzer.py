@@ -46,7 +46,7 @@ class ProjectAnalyzer:
         self.simulate_run = simulate_run
         
         # Setup paths:
-        project_output_dir= pathlib.Path(__file__).resolve().parent.parent / "projects" / project_name
+        project_output_dir= pathlib.Path(__file__).resolve().parent.parent / "projects_cleaned" / project_name
         
         # Paths stage 1 (Package analysis and usage specification)
         # Throw an error if project_output_dir allready exists, and exit the pipeline saying that there's aleady a project named that name

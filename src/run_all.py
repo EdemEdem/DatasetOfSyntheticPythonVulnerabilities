@@ -10,10 +10,7 @@ import src.cwe_context as sani_cont
 from src.project_analyzer import ProjectAnalyzer
 
 
-def iter_projects(repo_root: pathlib.Path):
-    
-    samples_dir = repo_root / "samples"
-    cql_dbs_dir = repo_root / "cql_dbs"
+def iter_projects(samples_dir, cql_dbs_dir, create_missing_dbs=False):
 
     if not samples_dir.is_dir():
         print(f"[ERROR] samples directory not found at: {samples_dir}")
@@ -65,6 +62,22 @@ def iter_projects(repo_root: pathlib.Path):
             if missing_dbs:
                 print(f"[ERROR] DBs missing for {repo_dir.name} under {cwe_name}: {', '.join(missing_dbs)} "
                       f"(expected under {dbs_base})")
+                if create_missing_dbs:
+                    if not missing_versions:
+                        print(f"  [INFO] Creating missing DBs under {dbs_base}...")
+                        dbs_base.mkdir(parents=True, exist_ok=True)
+                        for v in missing_dbs:
+                            cmd = [
+                                "codeql", "database", "create",
+                                "--language=python",
+                                f"--source-root={version_dirs[v]}",
+                                str(db_paths[v])
+                            ]
+                            print("  Running:", " ".join(cmd))
+                            try:
+                                sp.run(cmd, check=True)
+                            except sp.CalledProcessError as e:
+                                print(f"  [ERROR] Failed to create DB: {e}")
                 continue
 
             # All good: yield both versions
@@ -86,7 +99,9 @@ if __name__ == "__main__":
     repo_root = pathlib.Path(__file__).resolve().parent.parent
 
     found = 0
-    for cfg in iter_projects(repo_root):
+    samples_dir = repo_root / "samples_cleaned"
+    cql_dbs_dir = repo_root / "samples_claned_cql_dbs"
+    for cfg in iter_projects(samples_dir, cql_dbs_dir, create_missing_dbs=False):
         # Example of the variables you wanted to set:
         project_root = cfg["project_root"]
         cql_db_path = cfg["cql_db_path"]
@@ -98,24 +113,34 @@ if __name__ == "__main__":
         found += 1
         model="deepseek-reasoner"
         sanitizer_context = ""
+        rerun_package_extraction=False
         rerun_usage_prompting=False
-        rerun_triage_prompting=False
+        rerun_cql_dataflow_discovery=False
+        rerun_triage_prompting=True
         stop_after_package_extraction=False
         stop_after_usage_prompting=False
         stop_after_dataflow_caluclation=False
         simulate_run=False
         if cwe == "cwe78":
-            continue
-        if cwe == "cwe89":
-            continue
-    
+            sanitizer_context = sani_cont.cwe78
+            continue 
         if cwe == "cwe79":
             if project_id == "2":
                 print("skipping cwe78_2, pipeline can't handle the root having subdirs atm")
                 continue
+            if project_id in ["1","2","4","5"]:
+                continue
+            if version == "vuln":
+                continue
+            print("processing cwe79_3_safe")
             sanitizer_context = sani_cont.cwe79
+        if cwe == "cwe89":
+            sanitizer_context = sani_cont.cwe89
+            continue
         if cwe == "cwe94":
             sanitizer_context = sani_cont.cwe94
+            continue
+            
         analyzer = ProjectAnalyzer(
                 project_root=project_root,
                 project_name=name,
@@ -123,7 +148,9 @@ if __name__ == "__main__":
                 cwe=cwe,
                 model=model,
                 sanitizer_context = sanitizer_context,
+                rerun_package_extraction=rerun_package_extraction,
                 rerun_usage_prompting=rerun_usage_prompting,
+                rerun_cql_dataflow_discovery=rerun_cql_dataflow_discovery,
                 rerun_triage_prompting=rerun_triage_prompting,
                 stop_after_package_extraction=stop_after_package_extraction,
                 stop_after_usage_prompting=stop_after_usage_prompting,
