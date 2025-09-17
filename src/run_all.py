@@ -113,9 +113,9 @@ if __name__ == "__main__":
         found += 1
         model="deepseek-reasoner"
         sanitizer_context = ""
-        rerun_package_extraction=False
-        rerun_usage_prompting=False
-        rerun_cql_dataflow_discovery=False
+        rerun_package_extraction=True
+        rerun_usage_prompting=True
+        rerun_cql_dataflow_discovery=True
         rerun_triage_prompting=True
         stop_after_package_extraction=False
         stop_after_usage_prompting=False
@@ -125,21 +125,11 @@ if __name__ == "__main__":
             sanitizer_context = sani_cont.cwe78
             continue 
         if cwe == "cwe79":
-            if project_id == "2":
-                print("skipping cwe78_2, pipeline can't handle the root having subdirs atm")
-                continue
-            if project_id in ["1","2","4","5"]:
-                continue
-            if version == "vuln":
-                continue
-            print("processing cwe79_3_safe")
             sanitizer_context = sani_cont.cwe79
         if cwe == "cwe89":
             sanitizer_context = sani_cont.cwe89
-            continue
         if cwe == "cwe94":
             sanitizer_context = sani_cont.cwe94
-            continue
             
         analyzer = ProjectAnalyzer(
                 project_root=project_root,

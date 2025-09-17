@@ -3,6 +3,9 @@ import pathlib
 import importlib.util
 import os
 import json
+import re
+import ntpath
+import posixpath
 from collections import defaultdict
 
 # Adjust this to your project root
@@ -115,6 +118,26 @@ def analyze_with_tags(root_path):
         def type_chains(self):
             return self.type_chains_stack[-1]
         
+        @staticmethod
+        def _json_path(p) -> str:
+            """
+            Normalize a path string robustly and return a POSIX-style path.
+            - Uses ntpath for Windows-looking paths (drive/UNC or backslashes)
+            - Uses posixpath otherwise
+            - No filesystem access; safe on Linux/macOS/Windows
+            """
+            if not p:
+                return ""
+            s = str(p)
+            _windows_path_re = re.compile(r'^(?:[a-zA-Z]:[\\/]|\\\\)')  # drive or UNC
+            # Treat anything that looks Windows-y as Windows
+            if _windows_path_re.match(s) or ("\\" in s):
+                # Normalize with Windows rules, then convert to POSIX slashes
+                s = ntpath.normpath(s)
+                return s.replace("\\", "/")
+            # POSIX-style path
+            return posixpath.normpath(s)
+        
         def push_scope(self):
             # inherit imports tags and chains
             base_env = self.env_stack[0]
@@ -152,7 +175,9 @@ def analyze_with_tags(root_path):
         
         def record_call(self, node, full_chain, package, base):
             self.records.append({
-                "file":self.current_file,"lineno":node.lineno,"col":node.col_offset,
+                "file":self._json_path(self.current_file),
+                "lineno":node.lineno,
+                "col":node.col_offset,
                 "node_type":"Call",
                 "chain":full_chain,
                 "package":package,
@@ -168,7 +193,7 @@ def analyze_with_tags(root_path):
                     kind = "arg_starred"
                 expr_chain = self.extract_chain(expr)
                 self.records.append({
-                    "file":self.current_file,
+                    "file":self._json_path(self.current_file),
                     "lineno":arg.lineno,
                     "col":arg.col_offset,
                     "node_type":kind,
@@ -188,7 +213,7 @@ def analyze_with_tags(root_path):
                 col = getattr(kw, "col_offset", getattr(expr, "col_offset", node.col_offset))
                 kind = "kwarg" if kw.arg is not None else "kwarg_doublestar"
                 self.records.append({
-                    "file": self.current_file,
+                    "file":self._json_path(self.current_file),
                     "lineno": line,
                     "col": col,
                     "node_type": kind,
@@ -222,7 +247,7 @@ def analyze_with_tags(root_path):
                                 self.project_chains[name].append(fullchain)
                                 # record parameter as source candidate
                                 self.records.append({
-                                    "file": self.current_file,
+                                    "file":self._json_path(self.current_file),
                                     "lineno": getattr(arg, 'lineno', node.lineno),
                                     "col": getattr(arg, 'col_offset', node.col_offset),
                                     "node_type": "param","chain": fullchain,
@@ -244,7 +269,7 @@ def analyze_with_tags(root_path):
                                 self.env[name].add(package)
                                 # record parameter as source candidate
                                 self.records.append({
-                                    "file": self.current_file,
+                                    "file":self._json_path(self.current_file),
                                     "lineno": getattr(arg, 'lineno', node.lineno),
                                     "col": getattr(arg, 'col_offset', node.col_offset),
                                     "node_type": "param","chain": fullchain,
@@ -326,7 +351,7 @@ def analyze_with_tags(root_path):
                                 self.project_chains[name].append(fullchain)
                                 # record parameter as source candidate
                                 self.records.append({
-                                    "file": self.current_file,
+                                    "file":self._json_path(self.current_file),
                                     "lineno": getattr(arg, 'lineno', node.lineno),
                                     "col": getattr(arg, 'col_offset', node.col_offset),
                                     "node_type": "param","chain": fullchain,
@@ -348,7 +373,7 @@ def analyze_with_tags(root_path):
                                 self.env[name].add(package)
                                 # record parameter as source candidate
                                 self.records.append({
-                                    "file": self.current_file,
+                                    "file":self._json_path(self.current_file),
                                     "lineno": getattr(arg, 'lineno', node.lineno),
                                     "col": getattr(arg, 'col_offset', node.col_offset),
                                     "node_type": "param","chain": fullchain,
@@ -587,7 +612,7 @@ def analyze_with_tags(root_path):
                     node_chain = self.extract_chain(node)
                     full_chain = base_chain[:] + node_chain
                     self.records.append({
-                        "file": self.current_file,
+                        "file":self._json_path(self.current_file),
                         "lineno": node.lineno,
                         "col": node.col_offset,
                         "node_type": "Attribute",
@@ -604,7 +629,7 @@ def analyze_with_tags(root_path):
                     if base == base_chain[0]:
                         full_chain = node_chain
                     self.records.append({
-                        "file": self.current_file,
+                        "file":self._json_path(self.current_file),
                         "lineno": node.lineno,
                         "col": node.col_offset,
                         "node_type": "Attribute",
