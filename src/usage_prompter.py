@@ -87,6 +87,10 @@ class UsagePrompter:
             for chain in pkgs[pkg]:
                 chain_str = " ".join(chain)
                 chains.append(chain_str)
+            if pkg == "built_in":
+                prompt = src.prompt_templates.PACKAGE_PROMPT_BUILTIN.format( cwe=self.cwe, body="\n".join(chains))
+                prompts.append(prompt)
+                continue
             prompt =src.prompt_templates.PACKAGE_PROMPT_SINK_AND_SOURCE.format(package=pkg, cwe=self.cwe, body="\n".join(chains))
             prompts.append(prompt)
         return prompts
@@ -177,27 +181,6 @@ class UsagePrompter:
         return prompts
     
 def main():
-    '''
-    import argparse
-
-    parser = argparse.ArgumentParser(
-        description="Generate usage prompts from a JSONL specifications file."
-    )
-    parser.add_argument('jsonl_path', help='Path to specifications JSONL file', required=False)
-    parser.add_argument('cwe', help='CWE identifier, e.g. CWE-89', required=False)
-    parser.add_argument('cwe_context', help='Description or context of the CWE', required=False)
-    parser.add_argument('output_dir', help='Directory to save generated prompts', required=False)
-    parser.add_argument('--batch-size', type=int, default=20,
-                        help='Number of nodes per batch', required=False)
-
-    args = parser.parse_args()
-    
-    jsonl_path = args.jsonl_path or "C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/package_extractor_results/cwe89/repos_3/vuln/usages_sorted.jsonl"
-    cwe = args.cwe or "CWE 89"
-    cwe_context = args.cwe_context or "Sql injection. "
-    output_dir = args.output_dir or "C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/llm_results/prompts"
-    batch_size = args.batch_size or "30"
-    '''
     jsonl_path = "C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/package_extractor_results/cwe89/repos_3/vuln/usages_sorted.jsonl"
     cwe = "CWE 89"
     cwe_context = "Sql injection. "

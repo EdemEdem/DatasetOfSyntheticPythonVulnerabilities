@@ -113,23 +113,25 @@ if __name__ == "__main__":
         found += 1
         model="deepseek-reasoner"
         sanitizer_context = ""
-        rerun_package_extraction=True
-        rerun_usage_prompting=True
-        rerun_cql_dataflow_discovery=True
-        rerun_triage_prompting=True
+        rerun_package_extraction=False
+        rerun_usage_prompting=False
+        rerun_cql_dataflow_discovery=False
+        rerun_triage_prompting=False
         stop_after_package_extraction=False
         stop_after_usage_prompting=False
         stop_after_dataflow_caluclation=False
         simulate_run=False
         if cwe == "cwe78":
-            sanitizer_context = sani_cont.cwe78
-            continue 
+            sanitizer_context = sani_cont.cwe78 
         if cwe == "cwe79":
             sanitizer_context = sani_cont.cwe79
+            continue
         if cwe == "cwe89":
             sanitizer_context = sani_cont.cwe89
+            continue
         if cwe == "cwe94":
             sanitizer_context = sani_cont.cwe94
+            continue
             
         analyzer = ProjectAnalyzer(
                 project_root=project_root,

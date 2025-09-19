@@ -593,13 +593,16 @@ def analyze_with_tags(root_path):
                     fc = base_chain
                     pkg=base_chain[0]
                     self.record_call(node=node, full_chain=fc, package=pkg, base=func.id)
-            ###If it's a wrapper function
+            #If it's a wrapper function
             elif isinstance(func,ast.Name) and func.id in self.project_chains:
                 for base_chain in self.project_chains[func.id]:
                     fc = base_chain
                     pkg=base_chain[0]
                     self.record_call(node=node, full_chain=fc, package=pkg, base=func.id)
-                    
+            #A call to a built-in function or something else we don't have a chain for
+            elif isinstance(func,ast.Name) and func.id not in self.import_chains and func.id not in self.project_chains:
+                fc = ["built_in", func.id]
+                self.record_call(node=node, full_chain=fc, package="built_in", base=func.id)
             self.generic_visit(node)
             
         def visit_Attribute(self, node):
@@ -638,6 +641,19 @@ def analyze_with_tags(root_path):
                         "code": self.lines[node.lineno-1].strip(),
                         "tags": sorted(self.env.get(base, []))
                     })
+            elif base and base not in self.project_chains and base not in self.import_chains:
+                fc = ["built_in"] + self.extract_chain(node)[1:]
+                self.records.append({
+					"file":self._json_path(self.current_file),
+                    "lineno": node.lineno,
+                    "col": node.col_offset,
+                    "node_type": "Attribute",
+                    "chain": fc,
+                    "package": "built_in",
+                    "code": self.lines[node.lineno-1].strip(),
+                    "tags" : ["built_in"]
+				})
+                    
             self.generic_visit(node)            
 
     root=pathlib.Path(root_path).resolve()
