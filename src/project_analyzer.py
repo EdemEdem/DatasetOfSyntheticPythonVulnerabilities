@@ -261,8 +261,8 @@ class ProjectAnalyzer:
 if __name__ == "__main__":
      # Example usage
     cwe="cwe94"
-    identifier="1-expression_evaluator"
-    version="vuln"
+    identifier="2-cli_datafilter"
+    version="safe"
     
     # Define paths and parameters
     project_root=f"C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples_cleaned/{cwe}/repos_{identifier}/{version}"
@@ -270,11 +270,11 @@ if __name__ == "__main__":
     cql_db_path=f"C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples_cleaned_cql_dbs/{cwe}/dbs_{identifier}/{version}-db"
     model="deepseek-reasoner"
     sanitizer_context = "parameterized queries"
-    rerun_package_extraction=False
+    rerun_package_extraction=True
     rerun_usage_prompting=False
     rerun_cql_dataflow_discovery=False
     rerun_triage_prompting=False
-    stop_after_package_extraction=False
+    stop_after_package_extraction=True
     stop_after_usage_prompting=False
     stop_after_dataflow_caluclation=False
     simulate_run = False

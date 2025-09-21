@@ -15,7 +15,7 @@ legacy*
 
 .env
 
-samples/package_extractor_results/cwe*/*
+samples/package_extractor_results*
 samples/llm_results*
 
 cwe_average_accuracy_metrics*
