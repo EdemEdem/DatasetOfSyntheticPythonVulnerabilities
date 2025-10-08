@@ -100,8 +100,25 @@ class ProjectAnalyzer:
                     record = json.loads(line)
                     if record.get("package") not in internal_imports:
                         outfile.write(json.dumps(record) + "\n")
+    
+    def check_usage_specifications_present(self):
+        """Return True if both sources.jsonl and sinks.jsonl exist and contain at least one JSON entry."""
+        def file_has_entries(jsonl_path):
+            if not os.path.isfile(jsonl_path) or os.path.getsize(jsonl_path) == 0:
+                return False
+            with open(jsonl_path, "r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        json.loads(line)
+                        return True  # found at least one valid JSON entry
+                    except json.JSONDecodeError:
+                        continue
+            return False
+        sources_ok = file_has_entries(self.package_analysis_sources_jsonl)
+        sinks_ok = file_has_entries(self.package_analysis_sinks_jsonl)
+        return sources_ok and sinks_ok
 
-        
+
     def copy_over_sources_and_sinks(self):
         error = False
         query_run_dir = pathlib.Path("/Users/Edem Agbo/OneDrive/Skrivebord/MscThisis/codeql/qlpacks/codeql/python-queries/1.3.0/myQueries")
@@ -207,7 +224,11 @@ class ProjectAnalyzer:
             usage_analyzer.run_prompts()
             print("Finished runnig prompts")
             ran_usage_prompting = True
-            
+        
+        if not self.check_usage_specifications_present():
+            print("Did not find any candidates for both sources and sinks. Exiting run")
+            return
+        
         if ran_usage_prompting or self.rerun_cql_dataflow_discovery:
             print("Writing predicates ...")
             predicate_writer = PredicateWriter(
