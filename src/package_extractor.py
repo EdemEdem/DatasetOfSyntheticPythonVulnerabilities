@@ -1,4 +1,5 @@
 import ast
+import warnings
 import pathlib
 import importlib.util
 import os
@@ -13,6 +14,11 @@ import types
 import sys
 
 
+def parse_ast_silently(src: str, filename: str = "<unknown>"):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", SyntaxWarning)
+        return ast.parse(src, filename=filename)
+      
 def _compute_builtin_names():
     """Return (builtin_function_names_set, builtin_type_names_set, python_version_tuple)."""
     func_names = set(
@@ -66,7 +72,8 @@ def find_imports(root_path):
 
     for py in root.rglob("*.py"):
         text = py.read_text(encoding="utf-8", errors="ignore")
-        tree = ast.parse(text, filename=str(py))
+        #tree = ast.parse(text, filename=str(py))
+        tree = parse_ast_silently(text, filename=str(py))
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
