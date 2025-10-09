@@ -1,4 +1,5 @@
 combined_env
+venv
 *cql_dbs/
 
 *.pyc

@@ -1,4 +1,5 @@
 import ast
+import warnings
 import pathlib
 import importlib.util
 import os
@@ -15,6 +16,10 @@ PROJECT_STATE = "vuln"
 PATH_PROJECT_ROOT = f"/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/{PROJECT_CWE}/{PROJECT_REPO}/{PROJECT_STATE}"
 RESULT_PATH = f"C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/package_extractor_results/{PROJECT_CWE}/{PROJECT_REPO}/{PROJECT_STATE}/usages.jsonl"
 
+def parse_ast_silently(src: str, filename: str = "<unknown>"):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", SyntaxWarning)
+        return ast.parse(src, filename=filename)
 
 def discover_internal_modules(root_path):
     internal = set()
@@ -52,7 +57,8 @@ def find_imports(root_path):
 
     for py in root.rglob("*.py"):
         text = py.read_text(encoding="utf-8", errors="ignore")
-        tree = ast.parse(text, filename=str(py))
+        #tree = ast.parse(text, filename=str(py))
+        tree = parse_ast_silently(text, filename=str(py))
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
