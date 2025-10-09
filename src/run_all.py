@@ -113,16 +113,17 @@ if __name__ == "__main__":
         found += 1
         model="deepseek-reasoner"
         sanitizer_context = ""
-        rerun_package_extraction=False
-        rerun_usage_prompting=False
-        rerun_cql_dataflow_discovery=False
-        rerun_triage_prompting=False
+        rerun_package_extraction=True
+        rerun_usage_prompting=True
+        rerun_cql_dataflow_discovery=True
+        rerun_triage_prompting=True
         stop_after_package_extraction=False
         stop_after_usage_prompting=False
         stop_after_dataflow_caluclation=False
         simulate_run=False
         if cwe == "cwe78":
             sanitizer_context = sani_cont.cwe78 
+            continue
         if cwe == "cwe79":
             sanitizer_context = sani_cont.cwe79
             continue
@@ -131,7 +132,7 @@ if __name__ == "__main__":
             continue
         if cwe == "cwe94":
             sanitizer_context = sani_cont.cwe94
-            continue
+            
             
         analyzer = ProjectAnalyzer(
                 project_root=project_root,
@@ -150,40 +151,7 @@ if __name__ == "__main__":
                 simulate_run=simulate_run)
         analyzer.run_pipeline()
 
-
     if found == 0:
         print("[WARN] No projects found.")
     else:
         print(f"[OK] Found {found} project-version configurations.")
-
-    
-    
-    
-    
-    # loop through the dir called samples
-		# loop through all its' subdirs who's name starts with "cwe"
-  			#store it's cwe identifier. the number after cwe
-			# loop through all it's subdirs
-				# this is a subsubdir of samples and a subdir of cweXX
-				# this dir's name should start with "repos_" followed by a number between 1 and 5
-					# print out an error for me if that's not the case
-				#store the name of this dir
-				#also store the project_id
-							# this is the number that comes after "repos_"
-							# for some porjects there are some charachters after the number, also store those in the identifier
-				#then verify that this dir has a subdir called "vuln" and a subdir called "safe"
-					# print an error if this is not the case
-				# The projects are now located. Each project is stored at samples/cweXX/repos_identifier/verison
-					#version is always safe/vuln, and each project has two version
-				# Then locate the databases
-					# they reside in a dir called "cql_dbs", adjecent to the "samples" dir
-					# each projects database is at "cql_dbs/cweXX/dbs_identifier/version-db"
-						#example 1: cql_dbs/cwe79/dbs_5/vuln-db
-						#example 2: cql_dbs/cwe94/dbs_1-expression_evaluator/safe-db
-					# verify that each database exist
-					# print an error if it could not be found
-				# When a project(both versions) has been located, and it's databases located as well set these variables (bellow is an example for project 3 vulnerable version in cwe 89):
-					# project_root="C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/cwe89/repos_3/vuln"
-     				# name="repos_3"
-         			# cql_db_path="C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/cql_dbs/cwe89/dbs_3/vuln-db"
-            		# cwe="cwe89"

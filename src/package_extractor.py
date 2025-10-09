@@ -8,18 +8,33 @@ import re
 import ntpath
 import posixpath
 from collections import defaultdict
+import builtins
+import inspect
+import types
+import sys
 
-# Adjust this to your project root
-PROJECT_CWE = "cwe79"
-PROJECT_REPO = "repos_3"
-PROJECT_STATE = "vuln"
-PATH_PROJECT_ROOT = f"/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/{PROJECT_CWE}/{PROJECT_REPO}/{PROJECT_STATE}"
-RESULT_PATH = f"C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/package_extractor_results/{PROJECT_CWE}/{PROJECT_REPO}/{PROJECT_STATE}/usages.jsonl"
 
 def parse_ast_silently(src: str, filename: str = "<unknown>"):
     with warnings.catch_warnings():
         warnings.simplefilter("ignore", SyntaxWarning)
         return ast.parse(src, filename=filename)
+      
+def _compute_builtin_names():
+    """Return (builtin_function_names_set, builtin_type_names_set, python_version_tuple)."""
+    func_names = set(
+        name
+        for name, obj in vars(builtins).items()
+        if isinstance(obj, (types.BuiltinFunctionType, types.FunctionType))
+        and getattr(obj, "__module__", "") == "builtins"
+    )
+    type_names = set(
+        name
+        for name, obj in vars(builtins).items()
+        if inspect.isclass(obj) and getattr(obj, "__module__", "") == "builtins"
+    )
+    return func_names, type_names, sys.version_info[:3]
+
+BUILTIN_FUNC_NAMES, BUILTIN_TYPE_NAMES, PYTHON_VERSION = _compute_builtin_names()
 
 def discover_internal_modules(root_path):
     internal = set()
@@ -607,8 +622,10 @@ def analyze_with_tags(root_path):
                     self.record_call(node=node, full_chain=fc, package=pkg, base=func.id)
             #A call to a built-in function or something else we don't have a chain for
             elif isinstance(func,ast.Name) and func.id not in self.import_chains and func.id not in self.project_chains:
-                fc = ["built_in", func.id]
-                self.record_call(node=node, full_chain=fc, package="built_in", base=func.id)
+                #Has to be a built-in function or type for us to record it
+                if func.id in BUILTIN_FUNC_NAMES or func.id in BUILTIN_TYPE_NAMES:
+                    fc = ["built_in", func.id]
+                    self.record_call(node=node, full_chain=fc, package="built_in", base=func.id)
             self.generic_visit(node)
             
         def visit_Attribute(self, node):
@@ -730,9 +747,19 @@ def analyze_one_project(project_root, package_analysis_result_path):
 
 
 if __name__ == "__main__":
+    PROJECT_CWE = "cwe94"
+    PROJECT_REPO = "repos_1-expression_evaluator"
+    PROJECT_STATE = "vuln"
+    PATH_PROJECT_ROOT = f"/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/{PROJECT_CWE}/{PROJECT_REPO}/{PROJECT_STATE}"
+    RESULT_PATH = f"C:/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/package_extractor_results/{PROJECT_CWE}/{PROJECT_REPO}/{PROJECT_STATE}/usages.jsonl"
     internal_imports, external_imports = find_imports(PATH_PROJECT_ROOT)
     print("Internal imports:", sorted(internal_imports))
     print("External imports:", sorted(external_imports))
+    # Adjust this to your project root
     
+
     #analyze_all_samples(base_dir="/Users/Edem Agbo/DatasetOfSyntheticPythonVulnerabilities/samples/")
     analyze_one_project(PATH_PROJECT_ROOT, RESULT_PATH)
+    print(BUILTIN_FUNC_NAMES)
+    print(BUILTIN_TYPE_NAMES)
+    
