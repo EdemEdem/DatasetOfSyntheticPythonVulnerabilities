@@ -39,6 +39,9 @@ FROM_IMPORT_RE = re.compile(
 
 _WIN_ABS_RE = re.compile(r'^(?:[a-zA-Z]:[\\/]|\\\\[^\\\/]+[\\\/][^\\\/]+)')
 
+SINK_CONTEXT_LINES_TOP = 1
+SINK_CONTEXT_LINES_BOTTOM = 4
+
 
 #from query_llms import LLMClient
 
@@ -207,7 +210,8 @@ class TriagePrompter:
             parts.append(step)
             parts.append(self.extract_block_lines(block,self.context_lines_top,self.context_lines_bottom))
 
-        sink_code = filtered[-1][1]
+        #sink_code = filtered[-1][1]
+        sink_code = self.extract_code(filtered[-1][0], SINK_CONTEXT_LINES_TOP, SINK_CONTEXT_LINES_BOTTOM)
         sink_phys_loc = filtered[-1][0]["location"]['physicalLocation']
         sink_uri = sink_phys_loc['artifactLocation']['uri']
         sink_line = sink_phys_loc['region']['startLine']
