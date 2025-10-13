@@ -1,4 +1,5 @@
 import ast
+import warnings
 import pathlib
 import importlib.util
 import os
@@ -13,6 +14,11 @@ import types
 import sys
 
 
+def parse_ast_silently(src: str, filename: str = "<unknown>"):
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore", SyntaxWarning)
+        return ast.parse(src, filename=filename)
+      
 def _compute_builtin_names():
     """Return (builtin_function_names_set, builtin_type_names_set, python_version_tuple)."""
     func_names = set(
@@ -66,7 +72,8 @@ def find_imports(root_path):
 
     for py in root.rglob("*.py"):
         text = py.read_text(encoding="utf-8", errors="ignore")
-        tree = ast.parse(text, filename=str(py))
+        #tree = ast.parse(text, filename=str(py))
+        tree = parse_ast_silently(text, filename=str(py))
         for node in ast.walk(tree):
             if isinstance(node, ast.Import):
                 for alias in node.names:
@@ -613,7 +620,7 @@ def analyze_with_tags(root_path):
                     fc = base_chain
                     pkg=base_chain[0]
                     self.record_call(node=node, full_chain=fc, package=pkg, base=func.id)
-            #A call to a built-in function or something else we don't have a chain for
+            #A call to a function we don't have a chain for
             elif isinstance(func,ast.Name) and func.id not in self.import_chains and func.id not in self.project_chains:
                 #Has to be a built-in function or type for us to record it
                 if func.id in BUILTIN_FUNC_NAMES or func.id in BUILTIN_TYPE_NAMES:
@@ -657,19 +664,6 @@ def analyze_with_tags(root_path):
                         "code": self.lines[node.lineno-1].strip(),
                         "tags": sorted(self.env.get(base, []))
                     })
-            elif base and base not in self.project_chains and base not in self.import_chains:
-                fc = ["built_in"] + self.extract_chain(node)[1:]
-                self.records.append({
-					"file":self._json_path(self.current_file),
-                    "lineno": node.lineno,
-                    "col": node.col_offset,
-                    "node_type": "Attribute",
-                    "chain": fc,
-                    "package": "built_in",
-                    "code": self.lines[node.lineno-1].strip(),
-                    "tags" : ["built_in"]
-				})
-                    
             self.generic_visit(node)            
 
     root=pathlib.Path(root_path).resolve()

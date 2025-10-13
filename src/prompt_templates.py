@@ -7,8 +7,10 @@ A sink is a dangerous function that when executed with malicous data the vulnera
 Reply in json with either source, sink or none for each of these usages:
 {body}
 """
-PACKAGE_PROMPT_BUILTIN = """You are going to analyze the usage built-in python fuctions and other built nodes like attribute nodes.
+PACKAGE_PROMPT_BUILTIN = """You are going to analyze the usage built-in python fuctions and other built nodes.
 You will be supplied with different function calls, arguments, attributes that's been which have not been imported, but have been used in a python program.
+Keep in mind that there might've been some errors upstream, so if you se a node that you don't recognize as built-python node you can be confident that it's not a built in node, and insted comes from another area of the system.
+For node's that you don't recognize as built-in python nodes, you can safely classify them as "none".
 Your job is to define which of this nodes that can be a Source, Sink or none for the weakness {cwe}.
 A source is a place where malicious data can enter thh program.
 A sink is a dangerous function that when executed with malicous data the vulnerabilty is present.
