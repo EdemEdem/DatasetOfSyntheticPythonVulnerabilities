@@ -3,6 +3,7 @@ import os
 import shutil
 import sys
 import json
+from typing import Optional, Union
 import subprocess as sp
 
 from src.package_extractor import analyze_one_project, extract_external_imports_to_file
@@ -80,6 +81,78 @@ class ProjectAnalyzer:
         os.makedirs(self.triage_pormpts_dir, exist_ok=True)
         os.makedirs(self.triage_flows_dir, exist_ok=True)
     
+    def prev_run_path_is_valid(self, prev_path: pathlib.Path) -> bool:
+        """Check that a previous run folder follows the expected structure."""
+        expected_subdirs = [
+            "package_analysis",
+            "llm_results",
+        ]
+        if not prev_path.exists() or not prev_path.is_dir():
+            print(f"[ERROR] {prev_path} does not exist or is not a directory.")
+            return False
+
+        for sub in expected_subdirs:
+            subdir = prev_path / sub
+            if not subdir.exists() or not subdir.is_dir():
+                print(f"[ERROR] Missing subdirectory: {subdir}")
+                return False
+
+        print(f"[OK] Valid previous run structure found at {prev_path}")
+        return True
+
+    def set_prev_run_path(self, prev_path: pathlib.Path):
+        """
+        Copy all relevant files and directories from a previous run into the current run structure.
+        """
+
+        print(f"[INFO] Copying previous run data from: {prev_path}")
+
+        # ---- File-to-file mapping (individual key outputs) ----
+        file_mapping = {
+            prev_path / "package_analysis" / "usages_raw.jsonl": self.package_analysis_raw_jsonl,
+            prev_path / "package_analysis" / "usages_external.jsonl": self.package_analysis_result_jsonl,
+            prev_path / "package_analysis" / "origin.jsonl": self.package_origin_analysis_jsonl,
+
+            prev_path / "llm_results" / self.model / "spesification_results" / "sources.jsonl": self.package_analysis_sources_jsonl,
+            prev_path / "llm_results" / self.model / "spesification_results" / "sinks.jsonl": self.package_analysis_sinks_jsonl,
+            prev_path / "llm_results" / self.model / "spesification_results" / "TestSources.qll": self.package_analysis_sources_qll,
+            prev_path / "llm_results" / self.model / "spesification_results" / "TestSinks.qll": self.package_analysis_sinks_qll,
+
+            prev_path / "llm_results" / self.model / "codeQL_runs" / f"{self.cwe}-query.sarif": self.cql_output_sarif,
+            prev_path / "llm_results" / self.model / "codeQL_runs" / f"{self.cwe}-query.csv": self.cql_output_csv,
+            prev_path / "llm_results" / self.model / "triaged_flows" / f"filtered-{self.cwe}-query.sarif": self.filtred_sarif_path,
+        }
+
+        # ---- Directory mapping (prompt data and results) ----
+        dir_mapping = {
+            prev_path / "llm_results" / self.model / "usage_prompts": self.usage_pormpts_dir,
+            prev_path / "llm_results" / self.model / "spesification_results": self.spesification_result_dir,
+        }
+
+        # ---- Copy individual files ----
+        copied_files = 0
+        for src, dest in file_mapping.items():
+            if src.exists():
+                dest.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dest)
+                copied_files += 1
+                print(f"  → Copied file: {src} → {dest}")
+
+        # ---- Copy whole directories ----
+        copied_dirs = 0
+        for src_dir, dest_dir in dir_mapping.items():
+            if src_dir.exists():
+                if dest_dir.exists():
+                    shutil.rmtree(dest_dir)
+                shutil.copytree(src_dir, dest_dir)
+                copied_dirs += 1
+                print(f"  → Copied directory: {src_dir} → {dest_dir}")
+
+        if copied_files == 0 and copied_dirs == 0:
+            print("[WARN] No files or directories copied from previous run.")
+        else:
+            print(f"[OK] Copied {copied_files} files and {copied_dirs} directories from previous run.")
+
     
     def filter_internal_packages(self):
         # Step 1: Load internal imports from file 1
@@ -174,7 +247,21 @@ class ProjectAnalyzer:
                 shutil.rmtree(file_path)  # remove folder and its contents
         print(f"Successfully cleared {dir_path}")
     
-    def run_pipeline(self):
+    def run_pipeline(self, prev_run_path: Optional[Union[str, pathlib.Path]] = None):
+        if prev_run_path:
+            prev_path = pathlib.Path(prev_run_path)
+
+            if not prev_path.exists() or not prev_path.is_dir():
+                raise ValueError(f"[ERROR] Provided previous run path does not exist: {prev_run_path}")
+
+            if not self.prev_run_path_is_valid(prev_path):
+                raise ValueError(f"[ERROR] Invalid previous run structure at {prev_run_path}")
+
+            self.set_prev_run_path(prev_path)
+            print(f"[INFO] Loaded working directories and files from previous run at {prev_run_path}")
+        else:
+            print("[INFO] No previous run path provided — creating fresh working directories.")
+
         if self.simulate_run:
             print(f"Pretending to run pipeline for project {self.project_name} ... ")
             return
@@ -216,18 +303,15 @@ class ProjectAnalyzer:
             if os.path.getsize(self.package_analysis_sinks_jsonl) > 0:
                 print("LLM specified sinks already exist")
                 specification_exists = True
-                
+
         ran_usage_prompting = False
+   
         if not specification_exists or self.rerun_usage_prompting:
             usage_analyzer.save_prompts()
             print("Finished saving prompts")
-            usage_analyzer.run_prompts()
+            usage_analyzer.run_prompts_in_parallell()
             print("Finished runnig prompts")
             ran_usage_prompting = True
-        
-        if not self.check_usage_specifications_present():
-            print("Did not find any candidates for both sources and sinks. Exiting run")
-            return
         
         if ran_usage_prompting or self.rerun_cql_dataflow_discovery:
             print("Writing predicates ...")
@@ -247,6 +331,10 @@ class ProjectAnalyzer:
         if self.stop_after_usage_prompting:
             print("stop_after_usage_prompting is set to true")
             print("Exiting run")
+            return
+        
+        if not self.check_usage_specifications_present():
+            print("Did not find any candidates for both sources and sinks. Exiting run")
             return
         
         if not os.path.isfile(self.cql_output_sarif) or self.rerun_cql_dataflow_discovery:

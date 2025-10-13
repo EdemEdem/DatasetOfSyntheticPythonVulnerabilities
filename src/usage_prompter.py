@@ -5,6 +5,7 @@ import pathlib
 from collections import defaultdict
 from openai import OpenAI
 from dotenv import load_dotenv
+import concurrent.futures
 from typing import List, Dict, Iterator, Any, Union
 import src.prompt_templates
 
@@ -109,7 +110,35 @@ class UsagePrompter:
                 with open(filename, 'w') as f:
                     f.write(prompt)
                 total += 1
-        print(f"Saved {total} prompts to {self.output_dir}")        
+        print(f"Saved {total} prompts to {self.output_dir}")
+        
+    def run_prompts_in_parallell(self, max_workers: int = 8):
+        prompts = self.load_prompts(self.output_dir)
+        if not prompts:
+            print("No prompts loaded. Exiting.")
+            sys.exit(0)
+            
+        print(f"Running {len(prompts)} prompts in parallel with {max_workers} workers...")
+
+        def process_prompt(item):
+            filename, prompt = item
+            try:
+                raw = self.run_prompt(prompt)
+                data = json.loads(raw)
+                output_filename = os.path.splitext(filename)[0] + "_result.jsonl"
+                output_path = pathlib.Path(self.spesification_result_dir) / output_filename
+                with open(output_path, "a", encoding="utf-8") as f:
+                    for key, value in data.items():
+                        f.write(json.dumps({key: value}) + "\n")
+                return filename, "success"
+            except Exception as e:
+                return filename, f"error: {e}"
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            results = list(executor.map(process_prompt, prompts.items()))
+
+        for filename, status in results:
+            print(f"{filename}: {status}")        
     
     def run_prompts(self):
         prompts = self.load_prompts(self.output_dir)
