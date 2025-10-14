@@ -310,7 +310,11 @@ class TriagePrompter:
 
         results = data.get('runs', [])[0].get('results', [])
         flow_counter = 0
-
+        
+        if not results or len(results) == 0:
+            print("No results in SARIF file")
+            return
+        
         for res in results:
             # Some results may have multiple codeFlows
             for cf in res.get('codeFlows', []):

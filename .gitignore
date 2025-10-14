@@ -1,5 +1,7 @@
 combined_env
 venv
+pipeline_env
+
 *cql_dbs/
 
 *.pyc

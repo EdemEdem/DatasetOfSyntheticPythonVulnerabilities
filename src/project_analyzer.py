@@ -10,8 +10,9 @@ from src.package_extractor import analyze_one_project, extract_external_imports_
 from src.usage_prompter import UsagePrompter
 from src.write_ql_predicates import PredicateWriter
 from src.traiage_prompter import TriagePrompter
+from src.config import CODEQL_LOCAL_CUSTOM_DIR, CODEQL_CMD_TOOL
 
-from samples.utils.query_dbs_for_vuln import run_analyze_for_pipeline
+#from samples.utils.query_dbs_for_vuln import run_analyze_for_pipeline
 
 class ProjectAnalyzer:
     def __init__(
@@ -80,6 +81,8 @@ class ProjectAnalyzer:
         os.makedirs(self.triage_results_dir, exist_ok=True)
         os.makedirs(self.triage_pormpts_dir, exist_ok=True)
         os.makedirs(self.triage_flows_dir, exist_ok=True)
+        
+        self.cql_artifact_path = pathlib.Path(CODEQL_LOCAL_CUSTOM_DIR)
     
     def prev_run_path_is_valid(self, prev_path: pathlib.Path) -> bool:
         """Check that a previous run folder follows the expected structure."""
@@ -194,7 +197,7 @@ class ProjectAnalyzer:
 
     def copy_over_sources_and_sinks(self):
         error = False
-        query_run_dir = pathlib.Path("/Users/Edem Agbo/OneDrive/Skrivebord/MscThisis/codeql/qlpacks/codeql/python-queries/1.3.0/myQueries")
+        query_run_dir = self.cql_artifact_path
         if self.package_analysis_sources_qll.is_file():
             try:
                 shutil.copy(self.package_analysis_sources_qll, query_run_dir)
@@ -217,8 +220,31 @@ class ProjectAnalyzer:
         if error:
             sys.exit(1)
             
+    def copy_over_query(self):
+        error = False
+        query_run_dir = self.cql_artifact_path
+        taint_flow_query_path = pathlib.Path("src/taint_flow_query.ql")
+
+        if taint_flow_query_path.is_file():
+            try:
+                shutil.copy(taint_flow_query_path, query_run_dir)
+            except Exception as e:
+                print(f"[ERROR] copying taint_flow_query.ql: {e}")
+                error = True
+        else:
+            print("[ERROR] taint_flow_query.ql not found")
+            print(f"No file at path: {taint_flow_query_path}")
+            error = True
+
+        if error:
+            sys.exit(1)
+
+        
+        
+        
+    ##This is not used and can be deleted    
     def clear_sources_and_sinks(self):
-        query_run_dir = pathlib.Path("/Users/Edem Agbo/OneDrive/Skrivebord/MscThisis/codeql/qlpacks/codeql/python-queries/1.3.0/myQueries")
+        query_run_dir = self.cql_artifact_path
         source_qll_path = query_run_dir / "TestSources.qll"
         sink_qll_path = query_run_dir / "TestSinks.qll"
         if source_qll_path.exists():
@@ -231,12 +257,20 @@ class ProjectAnalyzer:
                 sink_qll_path.unlink()
             except Exception as e:
                 print(f"[ERROR] deleting TestSinks.qll: {e}")
-                
-    def find_data_flows_for_cwe(self):
-        self.clear_sources_and_sinks()
-        self.copy_over_sources_and_sinks()
-        query_dir ="C:/Users/Edem Agbo/OneDrive/Skrivebord/MscThisis/codeql/qlpacks/codeql/python-queries/1.3.0/myQueries"
-        run_analyze_for_pipeline(self.cql_output_sarif, self.cql_output_csv, self.cql_db_path, query_dir)
+    
+    def clear_cql_custom_directory(self):
+        query_run_dir = self.cql_artifact_path
+        if not query_run_dir.exists():
+            query_run_dir.mkdir(parents=True, exist_ok=True)
+
+        for item in query_run_dir.iterdir():
+            try:
+                if item.is_file() or item.is_symlink():
+                    item.unlink()
+                elif item.is_dir():
+                    shutil.rmtree(item)
+            except Exception as e:
+                print(f"[ERROR] deleting {item.name}: {e}")
 
     def clear_directory(self, dir_path):
         for filename in os.listdir(dir_path):
@@ -246,6 +280,23 @@ class ProjectAnalyzer:
             elif os.path.isdir(file_path):
                 shutil.rmtree(file_path)  # remove folder and its contents
         print(f"Successfully cleared {dir_path}")
+        
+    def run_analyze_for_pipeline(self,output_sarif, output_csv, project_codeql_db_path):
+        to_run_queries_full_path = self.cql_artifact_path
+        print("  ==> Running CodeQL analysis...")
+        sp.run([CODEQL_CMD_TOOL, "database", "analyze", "--rerun", project_codeql_db_path, "--format=sarif-latest", f"--output={output_sarif}", to_run_queries_full_path])
+        if not os.path.exists(output_sarif):
+            print("  ==> Result SARIF not produced; aborting"); return
+        sp.run([CODEQL_CMD_TOOL, "database", "analyze", "--rerun", project_codeql_db_path, "--format=csv", f"--output={output_csv}", to_run_queries_full_path])
+        if not os.path.exists(output_csv):
+            print("  ==> Result CSV not produced; aborting"); return
+        return
+
+    def find_data_flows_for_cwe(self):
+        self.clear_cql_custom_directory()
+        self.copy_over_sources_and_sinks()
+        self.copy_over_query()
+        self.run_analyze_for_pipeline(self.cql_output_sarif, self.cql_output_csv, self.cql_db_path)
     
     def run_pipeline(self, prev_run_path: Optional[Union[str, pathlib.Path]] = None):
         if prev_run_path:
@@ -347,6 +398,7 @@ class ProjectAnalyzer:
             print("stop_after_dataflow_caluclation set to true")
             print("Exiting")
             return
+        
         if not os.path.isfile(self.filtred_sarif_path) or self.rerun_triage_prompting:
             triage_analyzer = TriagePrompter(
                 self.project_root,

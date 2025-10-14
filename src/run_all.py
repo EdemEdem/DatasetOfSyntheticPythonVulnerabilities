@@ -101,7 +101,7 @@ if __name__ == "__main__":
     found = 0
     samples_dir = repo_root / "samples_cleaned"
     cql_dbs_dir = repo_root / "samples_claned_cql_dbs"
-    for cfg in iter_projects(samples_dir, cql_dbs_dir, create_missing_dbs=False):
+    for cfg in iter_projects(samples_dir, cql_dbs_dir, create_missing_dbs=True):
         # Example of the variables you wanted to set:
         project_root = cfg["project_root"]
         cql_db_path = cfg["cql_db_path"]
@@ -113,23 +113,20 @@ if __name__ == "__main__":
         found += 1
         model="deepseek-reasoner"
         sanitizer_context = ""
-        rerun_package_extraction=True
-        rerun_usage_prompting=True
+        rerun_package_extraction=False
+        rerun_usage_prompting=False
         rerun_cql_dataflow_discovery=True
-        rerun_triage_prompting=True
+        rerun_triage_prompting=False
         stop_after_package_extraction=False
         stop_after_usage_prompting=False
-        stop_after_dataflow_caluclation=False
+        stop_after_dataflow_caluclation=True
         simulate_run=False
         if cwe == "cwe78":
             sanitizer_context = sani_cont.cwe78 
-            continue
         if cwe == "cwe79":
             sanitizer_context = sani_cont.cwe79
-            continue
         if cwe == "cwe89":
             sanitizer_context = sani_cont.cwe89
-            continue
         if cwe == "cwe94":
             sanitizer_context = sani_cont.cwe94
             
