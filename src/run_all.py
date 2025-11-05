@@ -3,6 +3,7 @@ import os
 import shutil
 import sys
 import json
+import argparse
 import subprocess as sp
 import re
 import src.cwe_context as sani_cont
@@ -94,14 +95,30 @@ def iter_projects(samples_dir, cql_dbs_dir, create_missing_dbs=False):
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Run the context guardian pipeline, on the synthetic datset.")
+    parser.add_argument("--simulate_runs", action="store_true", help="Simulate runs without executing tools.")
+    parser.add_argument("--create_missing_dbs", action="store_true", help="Automatically create missing CodeQL databases.")
+    args = parser.parse_args()
+    simulate_run = False
+    create_missing_dbs = False
+    if args.simulate_runs:
+        simulate_run=True
+    if args.create_missing_dbs:
+        create_missing_dbs=True
+    
     # Assume this script lives somewhere under the dataset root; go up until we find 'samples' sibling 'cql_dbs'.
     # Commonly, repo_root = <.../DatasetOfSyntheticPythonVulnerabilities>
     repo_root = pathlib.Path(__file__).resolve().parent.parent
+    
+    # Define a subset of projects to run
+    project_names_for_subset_run = [ "cwe89_repos_5_safe"]
+    # Set flag to indicate subset run
+    run_on_subset = False
 
     found = 0
     samples_dir = repo_root / "samples_cleaned"
     cql_dbs_dir = repo_root / "samples_claned_cql_dbs"
-    for cfg in iter_projects(samples_dir, cql_dbs_dir, create_missing_dbs=True):
+    for cfg in iter_projects(samples_dir, cql_dbs_dir, create_missing_dbs=create_missing_dbs):
         # Example of the variables you wanted to set:
         project_root = cfg["project_root"]
         cql_db_path = cfg["cql_db_path"]
@@ -116,20 +133,27 @@ if __name__ == "__main__":
         rerun_package_extraction=False
         rerun_usage_prompting=False
         rerun_cql_dataflow_discovery=True
-        rerun_triage_prompting=False
+        rerun_triage_prompting=True
         stop_after_package_extraction=False
         stop_after_usage_prompting=False
-        stop_after_dataflow_caluclation=True
-        simulate_run=False
+        stop_after_dataflow_caluclation=False
         if cwe == "cwe78":
-            sanitizer_context = sani_cont.cwe78 
+            sanitizer_context = sani_cont.cwe78
+
         if cwe == "cwe79":
             sanitizer_context = sani_cont.cwe79
+
         if cwe == "cwe89":
             sanitizer_context = sani_cont.cwe89
+
         if cwe == "cwe94":
             sanitizer_context = sani_cont.cwe94
-            
+
+        if run_on_subset and len(project_names_for_subset_run)> 0:
+            if name not in project_names_for_subset_run:
+                continue        
+        print(f"\n[INFO] Analyzing project: {name} (CWE: {cwe}, version: {version})")
+        
             
         analyzer = ProjectAnalyzer(
                 project_root=project_root,

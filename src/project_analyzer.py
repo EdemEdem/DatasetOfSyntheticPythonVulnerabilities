@@ -10,9 +10,7 @@ from src.package_extractor import analyze_one_project, extract_external_imports_
 from src.usage_prompter import UsagePrompter
 from src.write_ql_predicates import PredicateWriter
 from src.traiage_prompter import TriagePrompter
-from src.config import CODEQL_LOCAL_CUSTOM_DIR, CODEQL_CMD_TOOL
-
-#from samples.utils.query_dbs_for_vuln import run_analyze_for_pipeline
+from src.CONFIG import CODEQL_LOCAL_CUSTOM_DIR, CODEQL_CMD_TOOL
 
 class ProjectAnalyzer:
     def __init__(
@@ -223,7 +221,8 @@ class ProjectAnalyzer:
     def copy_over_query(self):
         error = False
         query_run_dir = self.cql_artifact_path
-        taint_flow_query_path = pathlib.Path("src/taint_flow_query.ql")
+        src_path = pathlib.Path(__file__).parent.resolve()
+        taint_flow_query_path = src_path / "taint_flow_query.ql"
 
         if taint_flow_query_path.is_file():
             try:
@@ -311,7 +310,7 @@ class ProjectAnalyzer:
             self.set_prev_run_path(prev_path)
             print(f"[INFO] Loaded working directories and files from previous run at {prev_run_path}")
         else:
-            print("[INFO] No previous run path provided — creating fresh working directories.")
+            print("[INFO] No previous run path provided — using existing working dirs, or creating new if they can't be found.")
 
         if self.simulate_run:
             print(f"Pretending to run pipeline for project {self.project_name} ... ")
@@ -397,6 +396,10 @@ class ProjectAnalyzer:
         if self.stop_after_dataflow_caluclation:
             print("stop_after_dataflow_caluclation set to true")
             print("Exiting")
+            return
+        
+        if not os.path.isfile(self.cql_output_sarif):
+            print("No CodeQL dataflows found, exiting")
             return
         
         if not os.path.isfile(self.filtred_sarif_path) or self.rerun_triage_prompting:

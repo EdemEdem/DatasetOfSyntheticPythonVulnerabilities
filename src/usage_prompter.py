@@ -2,12 +2,31 @@ import json
 import os
 import sys
 import pathlib
+import importlib
+import concurrent.futures
 from collections import defaultdict
 from openai import OpenAI
 from dotenv import load_dotenv
-import concurrent.futures
 from typing import List, Dict, Iterator, Any, Union
 import src.prompt_templates
+from src.models.llm_interface import LLMInterface
+
+def load_model(model_name):
+    """Dynamically load an LLM backend by name."""
+    try:
+        module_path = f"src.models.{model_name.lower()}_model"
+        model_module = importlib.import_module(module_path)
+    except ModuleNotFoundError:
+        raise ValueError(f"Model '{model_name}' not found in src/models/")
+
+    for attr in dir(model_module):
+        obj = getattr(model_module, attr)
+        if isinstance(obj, type) and issubclass(obj, LLMInterface) and obj is not LLMInterface:
+            return obj()  # instantiate without extra args
+
+    raise ValueError(f"No valid LLM class found in {module_path}")
+
+
 
 class UsagePrompter:
     def __init__(
@@ -17,6 +36,7 @@ class UsagePrompter:
         spesification_result_dir: str,
         cwe: str,
         cwe_context: str,
+        model: str,
         batch_size: Union[int, str] = 20
     ):
         # Path to JSONL file; CWE identifier and context for prompts
@@ -25,6 +45,7 @@ class UsagePrompter:
         self.cwe = cwe
         self.cwe_context = cwe_context
         self.output_dir = output_dir
+        self.model = model
         # Ensure batch_size is integer
         try:
             self.batch_size = int(batch_size)
@@ -123,7 +144,7 @@ class UsagePrompter:
         def process_prompt(item):
             filename, prompt = item
             try:
-                raw = self.run_prompt(prompt)
+                raw = self.generate_response(prompt)
                 data = json.loads(raw)
                 output_filename = os.path.splitext(filename)[0] + "_result.jsonl"
                 output_path = pathlib.Path(self.spesification_result_dir) / output_filename
@@ -148,7 +169,7 @@ class UsagePrompter:
         
         for filename, prompt in prompts.items():
             print(f"Running prompt: {filename}")
-            raw = self.run_prompt(prompt)
+            raw = self.generate_response(prompt)
             try:
                 data = json.loads(raw)
             except json.JSONDecodeError as e:
@@ -164,7 +185,7 @@ class UsagePrompter:
                     f.write(line + "\n")
         return
         
-    def run_prompt(self, prompt):
+    def generate_response(self, prompt):
         load_dotenv()
         api_key = os.getenv("DEEPSEEK_API_KEY")
         client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")

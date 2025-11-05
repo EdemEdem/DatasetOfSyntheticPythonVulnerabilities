@@ -48,7 +48,7 @@ SINK_CONTEXT_LINES_BOTTOM = 4
 #CONTEXT_LINES = 2
 
 class TriagePrompter:
-    def __init__(self, repo_path: str, sarif_path: str, filtred_sarif_path: str, prompt_dir: str, result_dir: str, cwe: str, sanitizer_context: str, context_lines_top: int = 1, context_lines_bottom: int = 1, gap_limit_between_steps: int = 1):
+    def __init__(self, repo_path: str, sarif_path: str, filtred_sarif_path: str, prompt_dir: str, result_dir: str, cwe: str, sanitizer_context: str, model: str, context_lines_top: int = 1, context_lines_bottom: int = 1, gap_limit_between_steps: int = 1):
         self.repo_path = repo_path
         self.sarif_path = sarif_path
         self.filtred_sarif_path = filtred_sarif_path
@@ -56,6 +56,7 @@ class TriagePrompter:
         self.result_dir = result_dir
         self.cwe = cwe
         self.sanitizer_context = sanitizer_context
+        self.model = model
         self.context_lines_top = context_lines_top
         self.context_lines_bottom = context_lines_bottom
         self.gap_limit_between_steps = gap_limit_between_steps
@@ -277,7 +278,7 @@ class TriagePrompter:
         api_key = os.getenv("DEEPSEEK_API_KEY")
         client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
         response = client.chat.completions.create(
-            model="deepseek-chat",
+            model="deepseek-reasoner",
             messages=[
                 {"role": "system", "content": FLOW_PROMPT_SYSTEM_PROMPT.format(cwe=self.cwe, sanitizer_context=self.sanitizer_context)},
                 {"role": "user", "content": prompt},
