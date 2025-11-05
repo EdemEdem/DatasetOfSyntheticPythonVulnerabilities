@@ -19,7 +19,7 @@ How to prepare the prerequisits for the analysis:
         - In config.py: set CODEQL_LOCAL_CUSTOM_DIR to the absolute path to the directory you created
         - Make CodeQL available on path
 
-- STEP 1.2: Create codecql databases of
+- STEP 1.2: Create codecql databases of the projects
     - You should have CodeQL available on path for this
     - If running on the synthetic dataset you can run the run_all module with the flags --simulate_runs --create_missing_dbs
         - Run from the projects root dir with python -m src.run_all --simulate_runs --create_missing_dbs
@@ -31,11 +31,11 @@ How to prepare the prerequisits for the analysis:
         - In this file there has to be a class that inherits from LLMInterface e.g: class DeepseekReasoner(LLMInterface)
         - Create a method in this class called generate_response(), ensure that this method returns valid JSON
         
-        - I have used systems prompts, but I haven't gotten to implement funcitonality so that the system prompt can be taken as an argument in teh generate_response methods. I'll get to this shortly. Let me know if you need it urgently. 
+        - I have used systems prompts, but I haven't gotten to implement funcitonality so that the system prompt can be taken as an argument in the generate_response methods. I'll get to this shortly. Let me know if you need it urgently. 
         - If you have any other trouble also let me know
 
 
-STEP 3.1: How to run the pipeline (If you want to run the pipeline on all files follow Step 2.2)
+(ONLY FOR RUNNING ON SINGLE PROJECT)STEP 3.1: How to run the pipeline (If you want to run the pipeline on all files follow Step 3.2)
 - The file project_analyzer is responsible for analyzing a project
 - Set the following values:
     - path to the project root
@@ -48,3 +48,5 @@ STEP 3.2: How to anaylyze all projects in the synthetic dataset:
 
 
 STEP 3.3: analyzing results and creating metrics
+- This will come soon
+- Right now I've checked the directory triage_results in the projects_cleaned -directory. if the model have replyed yes that means the flow is vulnerable. A single yes means I take it as positive result

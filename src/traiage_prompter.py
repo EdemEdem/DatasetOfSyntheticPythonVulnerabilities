@@ -15,6 +15,8 @@ from urllib.parse import urlsplit, unquote
 from openai import OpenAI
 from dotenv import load_dotenv
 from src.prompt_templates import FLOW_PROMPT_SYSTEM_PROMPT
+from src.models.model_loader import load_model
+from src.CONFIG import ENABLE_DYNAMIC_MODEL_LOADING
 
 # matches lines like “1: import os” or “123: import mypkg.submod, otherpkg  # comment”
 IMPORT_RE = re.compile(
@@ -260,7 +262,11 @@ class TriagePrompter:
         return buckets
 
     def ask_llm_if_flow_is_safe(self, prompt: str, filename) -> bool:
-        raw = self.generate_response(prompt)
+        if ENABLE_DYNAMIC_MODEL_LOADING:
+            model = load_model(self.model)
+            raw = model.generate_response(prompt)
+        else:
+            raw = self.generate_response(prompt)
         try:
             data = json.loads(raw)
         except json.JSONDecodeError as e:
@@ -278,7 +284,7 @@ class TriagePrompter:
         api_key = os.getenv("DEEPSEEK_API_KEY")
         client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
         response = client.chat.completions.create(
-            model="deepseek-reasoner",
+            model="deepseek-",
             messages=[
                 {"role": "system", "content": FLOW_PROMPT_SYSTEM_PROMPT.format(cwe=self.cwe, sanitizer_context=self.sanitizer_context)},
                 {"role": "user", "content": prompt},
