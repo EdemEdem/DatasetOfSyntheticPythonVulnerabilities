@@ -25,9 +25,15 @@ How to prepare the prerequisits for the analysis:
         - Run from the projects root dir with python -m src.run_all --simulate_runs --create_missing_dbs
         - This will automatically create the codeql databases for each project in the synthetic dataset.
         
-- STEP 2:
-    - Ready the model for prompting.
-    - The model you're going to run should exist 
+- STEP 2: Ready the LLM for prompting.
+    - Ensure that the flag ENABLE_DYNAMIC_MODEL_LOADING in src/CONFIG is set to True
+    - For the model you're going to run you have to create a file at src/models/[model-name].py
+        - In this file there has to be a class that inherits from LLMInterface e.g: class DeepseekReasoner(LLMInterface)
+        - Create a method in this class called generate_response(), ensure that this method returns valid JSON
+        
+        - I have used systems prompts, but I haven't gotten to implement funcitonality so that the system prompt can be taken as an argument in teh generate_response methods. I'll get to this shortly. Let me know if you need it urgently. 
+        - If you have any other trouble also let me know
+
 
 STEP 3.1: How to run the pipeline (If you want to run the pipeline on all files follow Step 2.2)
 - The file project_analyzer is responsible for analyzing a project

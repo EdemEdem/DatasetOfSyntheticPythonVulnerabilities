@@ -1,14 +1,11 @@
+# src/models/deepseek_reasoner.py
 import os
 from openai import OpenAI
 from dotenv import load_dotenv
 from src.models.llm_interface import LLMInterface
 
-class DeepseekModel(LLMInterface):
-    def __init__(self, cwe, sanitizer_context):
-        self.cwe = cwe
-        self.sanitizer_context = sanitizer_context
-
-    def generate_response(self, prompt: str) -> dict:
+class DeepseekReasoner(LLMInterface):
+    def generate_response(self, prompt):
         load_dotenv()
         api_key = os.getenv("DEEPSEEK_API_KEY")
         client = OpenAI(api_key=api_key, base_url="https://api.deepseek.com")
@@ -16,9 +13,7 @@ class DeepseekModel(LLMInterface):
         response = client.chat.completions.create(
             model="deepseek-reasoner",
             messages=[
-                {"role": "system", "content": FLOW_PROMPT_SYSTEM_PROMPT.format(
-                    cwe=self.cwe, sanitizer_context=self.sanitizer_context
-                )},
+                {"role": "system", "content": "You are a reasoning assistant."},
                 {"role": "user", "content": prompt},
             ],
             response_format={'type': 'json_object'},
@@ -30,3 +25,4 @@ class DeepseekModel(LLMInterface):
             print("Error: Model returned no response.")
             return {"judgement": "none"}
         return content
+

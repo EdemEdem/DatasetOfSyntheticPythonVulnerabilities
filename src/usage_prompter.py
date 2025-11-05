@@ -9,24 +9,8 @@ from openai import OpenAI
 from dotenv import load_dotenv
 from typing import List, Dict, Iterator, Any, Union
 import src.prompt_templates
-from src.models.llm_interface import LLMInterface
-
-def load_model(model_name):
-    """Dynamically load an LLM backend by name."""
-    try:
-        module_path = f"src.models.{model_name.lower()}_model"
-        model_module = importlib.import_module(module_path)
-    except ModuleNotFoundError:
-        raise ValueError(f"Model '{model_name}' not found in src/models/")
-
-    for attr in dir(model_module):
-        obj = getattr(model_module, attr)
-        if isinstance(obj, type) and issubclass(obj, LLMInterface) and obj is not LLMInterface:
-            return obj()  # instantiate without extra args
-
-    raise ValueError(f"No valid LLM class found in {module_path}")
-
-
+from src.models.model_loader import load_model
+from src.CONFIG import ENABLE_DYNAMIC_MODEL_LOADING
 
 class UsagePrompter:
     def __init__(
@@ -144,7 +128,11 @@ class UsagePrompter:
         def process_prompt(item):
             filename, prompt = item
             try:
-                raw = self.generate_response(prompt)
+                if ENABLE_DYNAMIC_MODEL_LOADING:
+                    model = load_model(self.model)
+                    raw = model.generate_response(prompt)
+                else:
+                    raw = self.generate_response(prompt)
                 data = json.loads(raw)
                 output_filename = os.path.splitext(filename)[0] + "_result.jsonl"
                 output_path = pathlib.Path(self.spesification_result_dir) / output_filename
@@ -169,7 +157,11 @@ class UsagePrompter:
         
         for filename, prompt in prompts.items():
             print(f"Running prompt: {filename}")
-            raw = self.generate_response(prompt)
+            if ENABLE_DYNAMIC_MODEL_LOADING:
+                model = load_model(self.model)
+                raw = model.generate_response(prompt)
+            else:
+                raw = self.generate_response(prompt)
             try:
                 data = json.loads(raw)
             except json.JSONDecodeError as e:

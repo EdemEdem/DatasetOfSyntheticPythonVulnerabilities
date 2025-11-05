@@ -113,7 +113,7 @@ if __name__ == "__main__":
     # Define a subset of projects to run
     project_names_for_subset_run = [ "cwe89_repos_5_safe"]
     # Set flag to indicate subset run
-    run_on_subset = False
+    run_on_subset = True
 
     found = 0
     samples_dir = repo_root / "samples_cleaned"
@@ -128,10 +128,10 @@ if __name__ == "__main__":
         name = f"{cwe}_{cfg["name"]}_{version}"
 
         found += 1
-        model="deepseek-reasoner"
+        model="deepseek-chat"
         sanitizer_context = ""
         rerun_package_extraction=False
-        rerun_usage_prompting=False
+        rerun_usage_prompting=True
         rerun_cql_dataflow_discovery=True
         rerun_triage_prompting=True
         stop_after_package_extraction=False

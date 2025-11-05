@@ -336,7 +336,8 @@ class ProjectAnalyzer:
             output_dir = self.usage_pormpts_dir,
             spesification_result_dir = self.spesification_result_dir,
             cwe=self.cwe,
-            cwe_context= "")
+            cwe_context= "",
+            model=self.model,)
         
         if self.rerun_usage_prompting:
             print("Rerunning usage prompting, clearing old results ...")
@@ -411,6 +412,7 @@ class ProjectAnalyzer:
                 self.triage_results_dir,
                 self.cwe,
                 self.sanitizer_context,
+                self.model,
                 context_lines_top=1,
                 context_lines_bottom=1,
                 gap_limit_between_steps=1
