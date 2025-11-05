@@ -24,7 +24,12 @@ How to prepare the prerequisits for the analysis:
     - If running on the synthetic dataset you can run the run_all module with the flags --simulate_runs --create_missing_dbs
         - Run from the projects root dir with python -m src.run_all --simulate_runs --create_missing_dbs
         - This will automatically create the codeql databases for each project in the synthetic dataset.
-        
+
+
+
+
+
+
 - STEP 2: Ready the LLM for prompting.
     - Ensure that the flag ENABLE_DYNAMIC_MODEL_LOADING in src/CONFIG is set to True
     - For the model you're going to run you have to create a file at src/models/[model-name].py
@@ -35,11 +40,19 @@ How to prepare the prerequisits for the analysis:
         - If you have any other trouble also let me know
 
 
-(ONLY FOR RUNNING ON SINGLE PROJECT)STEP 3.1: How to run the pipeline (If you want to run the pipeline on all files follow Step 3.2)
+
+
+
+
+
+
+STEP 3.1 (ONLY FOR RUNNING ON SINGLE PROJECT) : How to run the pipeline (If you want to run the pipeline on all files follow Step 3.2)
 - The file project_analyzer is responsible for analyzing a project
 - Set the following values:
     - path to the project root
     - path to the projects CodeQL Database
+
+
 
 STEP 3.2: How to anaylyze all projects in the synthetic dataset:
 - The script run_all.py loops through all projects and analyzes them with the pipeline
