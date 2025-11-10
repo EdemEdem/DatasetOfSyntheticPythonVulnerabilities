@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from typing import List, Dict, Iterator, Any, Union
 import src.prompt_templates
 from src.models.model_loader import load_model
-from src.CONFIG import ENABLE_DYNAMIC_MODEL_LOADING
+from src.config import ENABLE_DYNAMIC_MODEL_LOADING
 
 class UsagePrompter:
     def __init__(

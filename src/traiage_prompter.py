@@ -16,7 +16,7 @@ from openai import OpenAI
 from dotenv import load_dotenv
 from src.prompt_templates import FLOW_PROMPT_SYSTEM_PROMPT
 from src.models.model_loader import load_model
-from src.CONFIG import ENABLE_DYNAMIC_MODEL_LOADING
+from src.config import ENABLE_DYNAMIC_MODEL_LOADING
 
 # matches lines like “1: import os” or “123: import mypkg.submod, otherpkg  # comment”
 IMPORT_RE = re.compile(

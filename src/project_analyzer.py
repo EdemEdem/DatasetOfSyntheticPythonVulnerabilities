@@ -10,7 +10,7 @@ from src.package_extractor import analyze_one_project, extract_external_imports_
 from src.usage_prompter import UsagePrompter
 from src.write_ql_predicates import PredicateWriter
 from src.traiage_prompter import TriagePrompter
-from src.CONFIG import CODEQL_LOCAL_CUSTOM_DIR, CODEQL_CMD_TOOL
+from src.config import CODEQL_LOCAL_CUSTOM_DIR, CODEQL_CMD_TOOL
 
 class ProjectAnalyzer:
     def __init__(
